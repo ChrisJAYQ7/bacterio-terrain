@@ -30,6 +30,11 @@ h1,h2,h3{margin:0;line-height:1.15}
 .entre{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .puces{display:flex;flex-wrap:wrap;gap:8px}
 .puce{font-size:14px;font-weight:700;background:var(--card);border:1.5px solid #E07B1A;color:var(--brun);padding:7px 12px;border-radius:999px}
+.semaines{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px}
+.sem{flex:0 0 auto;min-height:48px;padding:6px 16px;border-radius:14px;border:2px solid #D9D4F2;background:var(--card);color:var(--ink);font:inherit;font-weight:700;font-size:15px;text-align:left;cursor:pointer}
+.sem small{display:block;font-weight:600;font-size:12px;color:var(--mute)}
+.sem.actif{background:var(--ink);border-color:var(--ink);color:#F7F5EF}
+.sem.actif small{color:#CFCBE8}
 .puce.ok{border-color:transparent;background:var(--vert-l);color:#1E6B57}
 .btn{border:none;border-radius:16px;min-height:52px;padding:0 18px;font-size:16px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:10px}
 .btn-ambre{background:var(--ambre);color:var(--ink)}.btn-vert{background:var(--vert);color:#fff}.btn-noir{background:var(--ink);color:var(--bg)}
@@ -108,6 +113,7 @@ nav.onglets svg{width:24px;height:24px}
         <label class="btn btn-noir large" for="fichierPack">Ouvrir un pack terrain</label>
       </div>
       <div id="accAvecPack" style="display:none;flex-direction:column;gap:14px">
+        <div id="accSemaines" style="display:none"><div class="sur" style="color:var(--mute);margin-bottom:8px">Planning affiché</div><div class="semaines" id="accSemListe" role="tablist" aria-label="Choisir le planning"></div></div>
         <div class="carte sombre rangee" style="gap:18px"><div id="accAnneau" class="anneau"></div><div><div id="accCompte" style="font-size:24px;font-weight:700"></div><div style="color:#CFCBE8;font-size:14px">échantillons prélevés</div><div id="accReste" style="color:var(--ambre);font-weight:700;font-size:13px;margin-top:4px"></div></div></div>
         <div><div class="sur" style="color:var(--mute);margin-bottom:8px">Reste à trouver</div><div class="puces" id="accPuces"></div></div>
         <div><div class="entre" style="margin-bottom:8px"><span class="sur" style="color:var(--mute)">Magasins de la semaine</span><button class="btn btn-contour" style="min-height:40px;font-size:14px" data-aller="magasins">+ Magasin</button></div><div class="liste" id="accMagasins"></div></div>
@@ -196,7 +202,7 @@ nav.onglets svg{width:24px;height:24px}
 
 <script>
 'use strict';
-var APP_VERSION = '1.0.0';
+var APP_VERSION = '1.1.0';
 /* ======================= stockage (IndexedDB) ======================= */
 var DB = null;
 function ouvrirBase() {
@@ -250,7 +256,18 @@ function anneau(pct, taille) {
 }
 
 /* ======================= calculs ======================= */
-function produitsDuPack() { return PACK ? PRODUITS.filter(function (p) { return p.pack === PACK.id; }) : []; }
+function produitsDuPack(tous) { return PACK ? PRODUITS.filter(function (p) { return p.pack === PACK.id && (tous || !p.feuille || p.feuille === PACK.feuille); }) : []; }
+function analysesDe(feuille) {
+  var pl = (PACK.plannings || []).filter(function (x) { return x.feuille === feuille; })[0];
+  return pl ? pl.analyses : PACK.analyses;
+}
+function choisirPlanning(i) {
+  // plusieurs plannings dans un même pack : on affiche celui choisi (analyses, lignes, stock)
+  var pl = PACK && PACK.plannings && PACK.plannings[i];
+  if (!pl) return;
+  PACK.feuille = pl.feuille; PACK.titre = pl.titre; PACK.stock = pl.stock; PACK.analyses = pl.analyses; PACK.lignes = pl.lignes;
+  PACK.choix = i;
+}
 function dejaAnalyse(col) {
   var a = PACK.analyses.filter(function (x) { return x.col === col; })[0], n = a ? a.deja : 0;
   produitsDuPack().forEach(function (p) { if (p.ana && p.ana[col] > 0) n++; });
@@ -296,6 +313,13 @@ function dessinerAccueil() {
   $('accSansPack').style.display = avec ? 'none' : 'block';
   $('accAvecPack').style.display = avec ? 'flex' : 'none';
   if (!avec) { $('t-accueil').textContent = 'Bienvenue'; $('coteTitre').textContent = 'Aucun pack chargé'; $('coteAnneau').innerHTML = ''; return; }
+  var pls = PACK.plannings || [];
+  $('accSemaines').style.display = pls.length > 1 ? 'block' : 'none';
+  if (pls.length > 1) $('accSemListe').innerHTML = pls.map(function (x, i) {
+    var n = PRODUITS.filter(function (p) { return p.pack === PACK.id && p.feuille === x.feuille; }).length;
+    var court = x.feuille.split(' - ')[0], reste = x.feuille.indexOf(' - ') > 0 ? x.feuille.split(' - ').slice(1).join(' - ') : '';
+    return '<button class="sem' + (i === PACK.choix ? ' actif' : '') + '" role="tab" aria-selected="' + (i === PACK.choix) + '" data-planning="' + i + '">' + esc(court) + '<small>' + esc(reste.length > 22 ? reste.slice(0, 20) + '…' : reste) + (n ? ' · ' + n + ' ici' : '') + '</small></button>';
+  }).join('');
   var b = bilan(), pct = b.tot ? b.fait / b.tot : 0;
   $('accSur').textContent = PACK.feuille.split(' - ')[0] + ' · ' + PACK.annee;
   $('t-accueil').textContent = PACK.feuille.indexOf(' - ') > 0 ? PACK.feuille.split(' - ').slice(1).join(' - ') : PACK.feuille;
@@ -315,6 +339,13 @@ document.addEventListener('click', function (ev) {
   if (!b) return;
   choisirMagasin(b.getAttribute('data-mag'));
 });
+document.addEventListener('click', function (ev) {
+  var b = ev.target.closest('[data-planning]');
+  if (!b) return;
+  var i = +b.getAttribute('data-planning');
+  choisirPlanning(i); kvEcrire('planning', i); MAG = ''; kvEcrire('magasin', '');
+  dessinerAccueil(); toast('Planning affiché : ' + PACK.feuille);
+});
 function choisirMagasin(m) { MAG = m; kvEcrire('magasin', m); aller('magasin'); }
 
 /* ======================= chargement du pack ======================= */
@@ -326,18 +357,20 @@ $('fichierPack').addEventListener('change', function () {
     var t = String(lr.result || '').replace(/^﻿/, ''), p;
     try { p = JSON.parse(t); } catch (e) { toast('Ce fichier n\'est pas un pack terrain lisible.'); return; }
     if (!p || p.type !== 'bacterio-pack' || !p.analyses) { toast('Ce fichier n\'est pas un pack terrain BACTERIO.'); return; }
-    if (p.v > 1) toast('Pack d\'une version plus récente : mettez l\'application à jour.', 4000);
+    if (p.v > 2) toast('Pack d\'une version plus récente : mettez l\'application à jour.', 4000);
     kvEcrire('pack', p).then(function () {
-      installerPack(p); MAG = ''; aller('accueil');
-      toast('Pack chargé : ' + p.feuille + ' (' + (p.base || []).length + ' codes-barres)');
+      kvEcrire('planning', 0); installerPack(p, 0); MAG = ''; aller('accueil');
+      var np = (p.plannings || []).length;
+      toast('Pack chargé : ' + (np > 1 ? np + ' plannings (' + p.plannings.map(function (x) { return x.feuille.split(' - ')[0]; }).join(', ') + ')' : p.feuille) + ' · ' + (p.base || []).length + ' codes-barres', 4000);
       demanderStockagePersistant();
     }).catch(function (e) { toast('Impossible d\'enregistrer le pack : ' + e.message, 5000); });
   };
   lr.onerror = function () { toast('Lecture du fichier impossible.'); };
   lr.readAsText(f, 'utf-8');
 });
-function installerPack(p) {
-  PACK = p; BASE = {}; MARQUES = [];
+function installerPack(p, choix) {
+  PACK = p; BASE = {}; MARQUES = []; PACK.choix = 0;
+  if (p.plannings && p.plannings.length) choisirPlanning(choix >= 0 && choix < p.plannings.length ? choix : 0);
   (p.base || []).forEach(function (b) { BASE[String(b[0]).replace(/\s/g, '')] = b; });
   var vus = {};
   (p.produits || []).forEach(function (x) { var k = norm(x[0]); if (k && !vus[k]) { vus[k] = 1; MARQUES.push(x[0]); } });
@@ -644,7 +677,7 @@ $('btnProdRetour').addEventListener('click', function () {
 
 /* ======================= retour vers Excel ======================= */
 function dessinerRetour() {
-  var l = produitsDuPack(), ph = 0, ac = 0, nouv = 0;
+  var l = produitsDuPack(true), ph = 0, ac = 0, nouv = 0;
   l.forEach(function (p) { ph += p.photos.length; if (p.statut === 'completer') ac++; if (!p.exporte) nouv++; });
   $('retChiffres').innerHTML = '<div class="mini"><b style="font-size:26px">' + l.length + '</b><span class="muet">produits</span></div><div class="mini"><b style="font-size:26px">' + ph + '</b><span class="muet">photos</span></div><div class="mini" style="background:var(--ambre-l)"><b style="font-size:26px;color:var(--brun)">' + ac + '</b><span style="color:var(--brun);font-size:14px">à compléter</span></div>';
   kvLire('appareil').then(function (n) { if (n && !$('nomAppareil').value) $('nomAppareil').value = n; });
@@ -655,8 +688,9 @@ function dessinerRetour() {
 $('nomAppareil').addEventListener('change', function () { kvEcrire('appareil', this.value.trim()); });
 
 function ligneTsv(p) {
-  var ana = PACK.analyses.filter(function (a) { return p.ana[a.col] > 0; }).map(function (a) { return a.col + '|' + propre(a.nom).replace(/[|;]/g, ' ') + '|' + p.ana[a.col]; }).join(';');
-  var rep = PACK.analyses.filter(function (a) { return p.reprise.indexOf(a.col) >= 0; }).map(function (a) { return propre(a.nom); }).join(', ');
+  var lst = analysesDe(p.feuille);
+  var ana = lst.filter(function (a) { return p.ana[a.col] > 0; }).map(function (a) { return a.col + '|' + propre(a.nom).replace(/[|;]/g, ' ') + '|' + p.ana[a.col]; }).join(';');
+  var rep = lst.filter(function (a) { return p.reprise.indexOf(a.col) >= 0; }).map(function (a) { return propre(a.nom); }).join(', ');
   return [p.id, p.feuille, p.magasin, p.marque, p.denom, p.fx, p.ean, p.qte, p.stock, ana, (p.noms || []).join('|'), p.statut, rep, p.note, new Date(p.t).toISOString()].map(propre).join('\t');
 }
 function faireTsv(l, appareil) {
@@ -666,7 +700,7 @@ function faireTsv(l, appareil) {
   return t.join('\r\n') + '\r\n';
 }
 function exporter(avecPhotos) {
-  var l = produitsDuPack().slice().sort(function (a, b) { return a.t - b.t; });
+  var l = produitsDuPack(true).slice().sort(function (a, b) { return a.t - b.t; });
   if (!l.length) { toast('Aucun produit à envoyer.'); return; }
   var appareil = $('nomAppareil').value.trim() || 'telephone';
   kvEcrire('appareil', appareil);
@@ -688,7 +722,8 @@ function exporter(avecPhotos) {
   chaine.then(function () {
     var tsv = new TextEncoder().encode('﻿' + faireTsv(l, appareil));
     var stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
-    var court = propre(PACK.feuille.split(' - ')[0]).replace(/[^A-Za-z0-9-]/g, '');
+    var fs = {}; l.forEach(function (p) { fs[propre(String(p.feuille || '').split(' - ')[0]).replace(/[^A-Za-z0-9-]/g, '')] = 1; });
+    var court = Object.keys(fs).join('-') || 'S';
     var blob, nomF;
     if (avecPhotos) { fichiers.unshift({ nom: 'retour.tsv', data: tsv, quand: new Date() }); blob = faireZip(fichiers); nomF = 'Retour terrain ' + court + ' ' + stamp + '.zip'; }
     else { blob = new Blob([tsv], { type: 'text/tab-separated-values' }); nomF = 'Retour terrain ' + court + ' ' + stamp + '.tsv'; }
@@ -763,8 +798,8 @@ function navCote() {
 }
 window.addEventListener('resize', navCote);
 
-ouvrirBase().then(function () { return Promise.all([kvLire('pack'), tousProduits(), kvLire('magasin')]); }).then(function (r) {
-  if (r[0] && r[0].analyses && r[0].analyses.length) installerPack(r[0]);
+ouvrirBase().then(function () { return Promise.all([kvLire('pack'), tousProduits(), kvLire('magasin'), kvLire('planning')]); }).then(function (r) {
+  if (r[0] && r[0].analyses && r[0].analyses.length) installerPack(r[0], +r[3] || 0);
   PRODUITS = r[1] || []; MAG = r[2] || '';
   navCote(); etatReseau(); aller('accueil');
 }).catch(function (e) {
