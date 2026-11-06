@@ -146,6 +146,8 @@ nav.onglets svg{width:24px;height:24px}
       <div class="rangee"><button class="btn btn-contour" style="min-height:44px;width:44px;padding:0" id="btnScanRetour" aria-label="Retour">‹</button><h1 class="titre" id="t-scan" style="font-size:22px">Scanner le code-barres</h1></div>
       <div class="video" id="zoneVideo"><video id="video" playsinline muted></video><div class="viseur"></div></div>
       <p class="muet" id="scanEtat">Visez le code-barres dans le cadre.</p>
+      <label class="btn btn-contour large" for="photoCode" id="lblPhotoCode">Photographier le code-barres</label>
+      <input type="file" id="photoCode" accept="image/*" capture="environment" class="sr">
       <label class="champ" for="codeManuel">Ou tapez les chiffres du code<input type="tel" id="codeManuel" inputmode="numeric" autocomplete="off" placeholder="ex. 5410000123456"></label>
       <button class="btn btn-noir large" id="btnCodeOk">Valider ce code</button>
     </section>
@@ -163,6 +165,12 @@ nav.onglets svg{width:24px;height:24px}
       <div class="grille" style="grid-template-columns:repeat(2,minmax(0,1fr))">
         <label class="champ" for="pQte">Qté (unités achetées)<input type="number" id="pQte" min="0" inputmode="numeric"></label>
         <label class="champ" for="pStock" id="lblStock">Stock en rayon<input type="number" id="pStock" min="0" inputmode="numeric"></label>
+      </div>
+      <div class="sur" style="color:var(--mute)">Contre-échantillon (colonne C/E du planning)</div>
+      <div class="rangee" style="gap:8px;flex-wrap:wrap">
+        <input type="text" id="pCE" inputmode="numeric" autocomplete="off" placeholder="N° de contre-échantillon" style="flex:1 1 180px;min-height:48px;border:2px solid #D9D4F2;border-radius:14px;padding:0 14px;font:inherit;font-size:17px">
+        <button class="btn btn-contour" type="button" data-ce="N/A" style="min-height:48px">N/A</button>
+        <button class="btn btn-contour" type="button" data-ce="Qté insuff." style="min-height:48px">Qté insuff.</button>
       </div>
       <div class="photos" id="prodPhotos"></div>
       <label class="btn btn-pointille large" for="fichierPhoto">Photos (face, étiquette, DLC et lot)</label>
@@ -202,7 +210,7 @@ nav.onglets svg{width:24px;height:24px}
 
 <script>
 'use strict';
-var APP_VERSION = '1.1.0';
+var APP_VERSION = '1.2.0';
 /* ======================= stockage (IndexedDB) ======================= */
 var DB = null;
 function ouvrirBase() {
@@ -409,7 +417,7 @@ function dessinerMagasin() {
   var excel = (PACK.lignes || []).filter(function (x) { return norm(x.mg) === norm(MAG); });
   $('magNb').textContent = 'Produits pris ici · ' + (ici.length + excel.length);
   $('magProduits').innerHTML = ici.map(function (p) {
-    return '<button class="ligne-prod' + (p.statut === 'completer' ? ' completer' : '') + '" data-edit="' + p.id + '"><span class="entre"><b>' + esc(p.denom || 'Produit sans nom') + '</b><span class="muet">× ' + (p.qte || 0) + '</span></span><span class="puces" style="gap:6px">' + etiquettes(p.ana) + (p.statut === 'completer' ? '<span class="pastille p-ambre">à compléter au bureau</span>' : '') + '<span class="muet" style="font-size:12px">' + esc(p.marque) + (p.photos.length ? ' · ' + p.photos.length + ' photo(s)' : '') + '</span></span></button>';
+    return '<button class="ligne-prod' + (p.statut === 'completer' ? ' completer' : '') + '" data-edit="' + p.id + '"><span class="entre"><b>' + esc(p.denom || 'Produit sans nom') + '</b><span class="muet">× ' + (p.qte || 0) + '</span></span><span class="puces" style="gap:6px">' + etiquettes(p.ana) + (p.statut === 'completer' ? '<span class="pastille p-ambre">à compléter au bureau</span>' : '') + '<span class="muet" style="font-size:12px">' + esc(p.marque) + (p.photos.length ? ' · ' + p.photos.length + ' photo(s)' : '') + (p.ce ? ' · C/E ' + esc(p.ce) : '') + '</span></span></button>';
   }).join('') + excel.map(function (x) {
     var a = {}; (x.a || []).forEach(function (c) { a[c[0]] = c[1]; });
     return '<div class="ligne-prod" style="opacity:.75;cursor:default"><span class="entre"><b>' + esc(x.d) + '</b><span class="pastille p-gris">déjà dans Excel</span></span><span class="puces" style="gap:6px">' + etiquettes(a) + '</span></div>';
@@ -429,33 +437,186 @@ document.addEventListener('click', function (ev) {
 $('btnSansCode').addEventListener('click', function () { ouvrirProduit(null, ''); });
 
 /* ======================= scan ======================= */
+/* ===== lecteur EAN-13 / EAN-8 / UPC-A intégré (sans bibliothèque) : iPhone et téléphones sans BarcodeDetector ===== */
+var EAN = (function () {
+  var L = ['3211', '2221', '2122', '1411', '1132', '1231', '1114', '1312', '1213', '3112'];
+  var PAR = ['LLLLLL', 'LLGLGG', 'LLGGLG', 'LLGGGL', 'LGLLGG', 'LGGLLG', 'LGGGLL', 'LGLGLG', 'LGLGGL', 'LGGLGL'];
+  var PL = L.map(function (s) { return s.split('').map(Number); });
+  var PG = PL.map(function (p) { return p.slice().reverse(); });
+  function chiffre(r, i, tables) {
+    // 4 largeurs -> le chiffre le plus proche (normalisé sur 7 modules)
+    var s = r[i] + r[i + 1] + r[i + 2] + r[i + 3]; if (!s) return null;
+    var best = null, be = 1e9;
+    for (var t = 0; t < tables.length; t++) for (var d = 0; d < 10; d++) {
+      var p = tables[t][1][d], e = 0;
+      for (var k = 0; k < 4; k++) { var x = r[i + k] * 7 / s - p[k]; e += x * x; }
+      if (e < be) { be = e; best = { d: d, t: tables[t][0] }; }
+    }
+    return be < 2.2 ? best : null;
+  }
+  function garde(r, i, n, m) {
+    for (var k = 0; k < n; k++) { var q = r[i + k] / m; if (q < 0.45 || q > 1.9) return false; }
+    return true;
+  }
+  function cle(code) {
+    var s = 0, n = code.length;
+    for (var i = 0; i < n - 1; i++) s += (+code[i]) * (((n - 1 - i) % 2 === 1) ? 3 : 1);
+    return (10 - s % 10) % 10 === +code[n - 1];
+  }
+  function ean13(r, i) {
+    if (i + 59 > r.length) return null;
+    var m = (r[i] + r[i + 1] + r[i + 2]) / 3;
+    if (!garde(r, i, 3, m)) return null;
+    var tot = 0; for (var k = i; k < i + 59; k++) tot += r[k];
+    var mod = tot / 95; if (m / mod < 0.5 || m / mod > 1.8) return null;
+    var par = '', g = '';
+    for (var d = 0; d < 6; d++) { var c = chiffre(r, i + 3 + d * 4, [['L', PL], ['G', PG]]); if (!c) return null; par += c.t; g += c.d; }
+    if (!garde(r, i + 27, 5, mod)) return null;
+    var dr = '';
+    for (d = 0; d < 6; d++) { c = chiffre(r, i + 32 + d * 4, [['R', PL]]); if (!c) return null; dr += c.d; }
+    if (!garde(r, i + 56, 3, mod)) return null;
+    var p0 = PAR.indexOf(par); if (p0 < 0) return null;
+    var code = p0 + g + dr;
+    return cle(code) ? code : null;
+  }
+  function ean8(r, i) {
+    if (i + 43 > r.length) return null;
+    var m = (r[i] + r[i + 1] + r[i + 2]) / 3;
+    if (!garde(r, i, 3, m)) return null;
+    var tot = 0; for (var k = i; k < i + 43; k++) tot += r[k];
+    var mod = tot / 67;
+    var code = '';
+    for (var d = 0; d < 4; d++) { var c = chiffre(r, i + 3 + d * 4, [['L', PL]]); if (!c) return null; code += c.d; }
+    if (!garde(r, i + 19, 5, mod)) return null;
+    for (d = 0; d < 4; d++) { c = chiffre(r, i + 24 + d * 4, [['R', PL]]); if (!c) return null; code += c.d; }
+    if (!garde(r, i + 40, 3, mod)) return null;
+    return cle(code) ? code : null;
+  }
+  function runs(px, debut) {
+    // px : 0 = noir, 1 = blanc ; renvoie les largeurs à partir de la première barre noire
+    var r = [], n = 1, i = debut;
+    while (i < px.length && px[i] === 1) i++;
+    if (i >= px.length) return r;
+    var c = px[i];
+    for (i = i + 1; i < px.length; i++) { if (px[i] === c) n++; else { r.push(n); n = 1; c = px[i]; } }
+    r.push(n);
+    return r;
+  }
+  function ligne(g) {
+    // binarisation par moyenne locale (fenêtre glissante)
+    var n = g.length, w = Math.max(8, n >> 4), px = new Uint8Array(n), s = 0, a = 0, b = 0, mn = 255, mx = 0, i;
+    var f = new Float64Array(n);
+    for (i = 0; i < n; i++) f[i] = (g[Math.max(0, i - 1)] + 2 * g[i] + g[Math.min(n - 1, i + 1)]) / 4;
+    g = f;
+    for (i = 0; i < n; i++) { if (g[i] < mn) mn = g[i]; if (g[i] > mx) mx = g[i]; }
+    if (mx - mn < 40) return null;
+    // seuil = milieu entre le plus sombre et le plus clair autour du point (insensible au flou et aux marges blanches)
+    w = Math.max(10, n >> 5);
+    for (i = 0; i < n; i++) {
+      a = Math.max(0, i - w); b = Math.min(n, i + w + 1);
+      var lo = 255, hi = 0;
+      for (var j = a; j < b; j++) { if (g[j] < lo) lo = g[j]; if (g[j] > hi) hi = g[j]; }
+      s = hi - lo < (mx - mn) * 0.35 ? (mn + mx) / 2 : (lo + hi) / 2;
+      px[i] = g[i] < s ? 0 : 1;
+    }
+    return px;
+  }
+  function lireLigne(g) {
+    var px = ligne(g); if (!px) return null;
+    for (var sens = 0; sens < 2; sens++) {
+      var p = px; if (sens) { p = new Uint8Array(px.length); for (var k = 0; k < px.length; k++) p[k] = px[px.length - 1 - k]; }
+      var r = runs(p, 0);
+      for (var i = 0; i + 43 <= r.length; i += 2) {
+        var c = ean13(r, i); if (c) return c;
+        c = ean8(r, i); if (c) return c;
+      }
+    }
+    return null;
+  }
+  function gris(d, w, h, x0, y0, dx, dy, n) {
+    var g = new Uint8Array(n);
+    for (var i = 0; i < n; i++) { var x = Math.round(x0 + dx * i), y = Math.round(y0 + dy * i), o = (y * w + x) * 4; g[i] = (d[o] * 30 + d[o + 1] * 59 + d[o + 2] * 11) / 100; }
+    return g;
+  }
+  function lireImage(d, w, h, vus, seuil) {
+    // lignes horizontales puis verticales autour du centre ; un code doit être lu « seuil » fois pour être retenu
+    var k, c, y, x; vus = vus || {}; seuil = seuil || 2;
+    for (k = 0; k < 15; k++) {
+      y = Math.round(h * (0.2 + 0.6 * k / 14));
+      c = lireLigne(gris(d, w, h, 0, y, 1, 0, w));
+      if (c) { vus[c] = (vus[c] || 0) + 1; if (vus[c] >= seuil) return c; }
+    }
+    for (k = 0; k < 11; k++) {
+      x = Math.round(w * (0.25 + 0.5 * k / 10));
+      c = lireLigne(gris(d, w, h, x, 0, 0, 1, h));
+      if (c) { vus[c] = (vus[c] || 0) + 1; if (vus[c] >= seuil) return c; }
+    }
+    return null;
+  }
+  return { lireImage: lireImage, lireLigne: lireLigne };
+})();
+
+var MODE_SCAN = '', VUS = {}, TOILE = null;
 function demarrerScan() {
   if (!PACK) { toast('Ouvrez d\'abord un pack terrain.'); aller('accueil'); return; }
   if (!MAG) { toast('Choisissez d\'abord le magasin.'); aller('magasins'); return; }
   RETOUR_SCAN = 'magasin';
   aller('scan');
-  $('codeManuel').value = '';
-  $('scanEtat').textContent = 'Visez le code-barres dans le cadre.';
-  if (!('BarcodeDetector' in window)) { $('zoneVideo').style.display = 'none'; $('scanEtat').textContent = 'Lecture automatique non disponible sur ce téléphone : tapez les chiffres du code.'; return; }
+  $('codeManuel').value = ''; VUS = {};
+  $('scanEtat').textContent = 'Visez le code-barres dans le cadre, bien droit, à 10-15 cm.';
   $('zoneVideo').style.display = 'block';
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { $('zoneVideo').style.display = 'none'; $('scanEtat').textContent = 'Caméra non disponible : tapez les chiffres du code.'; return; }
-  try { DETECTEUR = DETECTEUR || new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128'] }); }
-  catch (e) { $('zoneVideo').style.display = 'none'; $('scanEtat').textContent = 'Lecture automatique non disponible : tapez les chiffres du code.'; return; }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { $('zoneVideo').style.display = 'none'; $('scanEtat').textContent = 'Caméra directe non disponible : « Photographier le code-barres » ou tapez les chiffres.'; return; }
+  MODE_SCAN = 'js';
+  if ('BarcodeDetector' in window) {
+    try { DETECTEUR = DETECTEUR || new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128'] }); MODE_SCAN = 'natif'; } catch (e) { MODE_SCAN = 'js'; }
+  }
   navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false }).then(function (s) {
-    FLUX = s; var v = $('video'); v.srcObject = s; return v.play();
+    FLUX = s; var v = $('video'); v.setAttribute('playsinline', ''); v.muted = true; v.srcObject = s; return v.play();
   }).then(function () { boucleScan(); }).catch(function () {
     $('zoneVideo').style.display = 'none';
-    $('scanEtat').textContent = 'Caméra refusée ou occupée. Autorisez la caméra (cadenas à côté de l\'adresse), ou tapez les chiffres du code.';
+    $('scanEtat').textContent = 'Caméra refusée ou occupée. Autorisez la caméra pour ce site (Réglages › Safari › Caméra sur iPhone, cadenas de l\'adresse sur Android), ou « Photographier le code-barres ».';
   });
 }
+function codeTrouve(code) { if (navigator.vibrate) navigator.vibrate(60); arreterCamera(); ouvrirProduit(null, code); }
 function boucleScan() {
   if (!FLUX) return;
   var v = $('video');
-  DETECTEUR.detect(v).then(function (r) {
-    if (r && r.length && r[0].rawValue) { var code = r[0].rawValue; if (navigator.vibrate) navigator.vibrate(60); arreterCamera(); ouvrirProduit(null, code); return; }
-    BOUCLE = setTimeout(boucleScan, 180);
-  }).catch(function () { BOUCLE = setTimeout(boucleScan, 400); });
+  if (MODE_SCAN === 'natif') {
+    DETECTEUR.detect(v).then(function (r) {
+      if (r && r.length && r[0].rawValue) { codeTrouve(r[0].rawValue); return; }
+      BOUCLE = setTimeout(boucleScan, 180);
+    }).catch(function () { MODE_SCAN = 'js'; BOUCLE = setTimeout(boucleScan, 200); });
+    return;
+  }
+  // lecteur intégré (iPhone…) : une image de la vidéo, lignes de lecture au centre
+  try {
+    if (v.videoWidth) {
+      var w = Math.min(1280, v.videoWidth), h = Math.round(v.videoHeight * w / v.videoWidth);
+      TOILE = TOILE || document.createElement('canvas'); TOILE.width = w; TOILE.height = h;
+      var cx = TOILE.getContext('2d', { willReadFrequently: true }); cx.drawImage(v, 0, 0, w, h);
+      var c = EAN.lireImage(cx.getImageData(0, 0, w, h).data, w, h, VUS, 2);
+      if (c) { codeTrouve(c); return; }
+    }
+  } catch (e) {}
+  BOUCLE = setTimeout(boucleScan, 120);
 }
+$('photoCode').addEventListener('change', function () {
+  var f = this.files && this.files[0]; this.value = '';
+  if (!f) return;
+  $('scanEtat').textContent = 'Lecture de la photo…';
+  var u = URL.createObjectURL(f), im = new Image();
+  im.onload = function () {
+    URL.revokeObjectURL(u);
+    var w = Math.min(1600, im.naturalWidth), h = Math.round(im.naturalHeight * w / im.naturalWidth);
+    var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+    var cx = cv.getContext('2d'); cx.drawImage(im, 0, 0, w, h);
+    var c = EAN.lireImage(cx.getImageData(0, 0, w, h).data, w, h, {}, 1);
+    if (c) codeTrouve(c);
+    else $('scanEtat').textContent = 'Code non lu sur la photo : rapprochez-vous, code bien droit et net, ou tapez les chiffres.';
+  };
+  im.onerror = function () { URL.revokeObjectURL(u); $('scanEtat').textContent = 'Photo illisible : tapez les chiffres du code.'; };
+  im.src = u;
+});
 function arreterCamera() {
   clearTimeout(BOUCLE); BOUCLE = null;
   if (FLUX) { FLUX.getTracks().forEach(function (t) { t.stop(); }); FLUX = null; }
@@ -476,7 +637,7 @@ function ouvrirProduit(existant, code) {
     FORM = JSON.parse(JSON.stringify(existant)); EDIT = existant.id;
   } else {
     EDIT = null;
-    FORM = { id: uid(), pack: PACK.id, feuille: PACK.feuille, magasin: MAG, marque: '', denom: '', fx: '', ean: code || '', qte: 0, stock: '', ana: {}, photos: [], statut: 'ok', reprise: [], note: '', t: Date.now(), exporte: false, trouve: false };
+    FORM = { id: uid(), pack: PACK.id, feuille: PACK.feuille, magasin: MAG, marque: '', denom: '', fx: '', ean: code || '', qte: 0, stock: '', ana: {}, photos: [], statut: 'ok', reprise: [], note: '', ce: '', t: Date.now(), exporte: false, trouve: false };
     var b = code ? BASE[code] : null;
     if (b) { FORM.marque = b[1] || ''; FORM.denom = b[2] || ''; FORM.fx = b[3] || ''; FORM.trouve = true; if (b[4] && FORM.denom.indexOf(b[4]) < 0 && /\d/.test(b[4])) FORM.denom = (FORM.denom + ' ' + b[4]).trim(); }
     else if (code) FORM.statut = 'completer';
@@ -484,7 +645,7 @@ function ouvrirProduit(existant, code) {
   $('prodMag').textContent = FORM.magasin + ' · ' + PACK.feuille.split(' - ')[0];
   $('t-produit').textContent = existant ? 'Modifier le produit' : (FORM.trouve ? 'Produit reconnu' : (FORM.ean ? 'Code inconnu' : 'Produit sans code-barres'));
   $('pMarque').value = FORM.marque; $('pDenom').value = FORM.denom;
-  $('pQte').value = FORM.qte || ''; $('pStock').value = FORM.stock || '';
+  $('pQte').value = FORM.qte || ''; $('pStock').value = FORM.stock || ''; $('pCE').value = FORM.ce || ''; teinteCE();
   $('lblStock').style.display = PACK.stock ? 'flex' : 'none';
   $('pCompleter').checked = FORM.statut === 'completer';
   $('btnSupprimer').style.display = existant ? 'flex' : 'none';
@@ -503,6 +664,15 @@ function majDenoms() {
   (PACK.produits || []).forEach(function (x) { if (!m || norm(x[0]) === m) l.push(x[1]); });
   $('dlDenoms').innerHTML = l.slice(0, 400).map(function (d) { return '<option value="' + esc(d) + '">'; }).join('');
 }
+function teinteCE() {
+  var v = $('pCE').value.trim();
+  document.querySelectorAll('[data-ce]').forEach(function (b) { var on = b.getAttribute('data-ce') === v; b.style.background = on ? 'var(--ink)' : ''; b.style.color = on ? '#F7F5EF' : ''; });
+}
+document.addEventListener('click', function (ev) {
+  var b = ev.target.closest('[data-ce]'); if (!b) return;
+  var v = b.getAttribute('data-ce'); $('pCE').value = ($('pCE').value.trim() === v) ? '' : v; teinteCE();
+});
+$('pCE').addEventListener('input', teinteCE);
 $('pMarque').addEventListener('input', function () { FORM.marque = this.value; majDenoms(); dessinerAnalyses(); });
 $('pDenom').addEventListener('input', function () { FORM.denom = this.value; clearTimeout(this.h); this.h = setTimeout(dessinerAnalyses, 300); });
 $('pDenom').addEventListener('change', function () {
@@ -541,6 +711,7 @@ function dejaCetteSemaine() {
 }
 
 function dessinerAnalyses() {
+  if (!FORM) return;
   var rows = historiqueProduit(), al = [];
   var dup = dejaCetteSemaine();
   if (dup) al.push('<div class="alerte"><b>Déjà pris cette semaine</b><span class="muet" style="color:var(--ink2)">Même produit noté pour ' + esc(dup) + '. Vérifiez que ce n\'est pas un doublon.</span></div>');
@@ -640,7 +811,7 @@ document.addEventListener('click', function (ev) {
 
 $('btnEnregistrer').addEventListener('click', function () {
   FORM.marque = $('pMarque').value.trim(); FORM.denom = $('pDenom').value.trim();
-  FORM.qte = parseInt($('pQte').value, 10) || 0; FORM.stock = $('pStock').value.trim();
+  FORM.qte = parseInt($('pQte').value, 10) || 0; FORM.stock = $('pStock').value.trim(); FORM.ce = $('pCE').value.trim();
   FORM.statut = $('pCompleter').checked ? 'completer' : 'ok';
   var cols = Object.keys(FORM.ana).map(Number);
   if (!cols.length) { toast('Cochez au moins une analyse.'); return; }
@@ -691,11 +862,11 @@ function ligneTsv(p) {
   var lst = analysesDe(p.feuille);
   var ana = lst.filter(function (a) { return p.ana[a.col] > 0; }).map(function (a) { return a.col + '|' + propre(a.nom).replace(/[|;]/g, ' ') + '|' + p.ana[a.col]; }).join(';');
   var rep = lst.filter(function (a) { return p.reprise.indexOf(a.col) >= 0; }).map(function (a) { return propre(a.nom); }).join(', ');
-  return [p.id, p.feuille, p.magasin, p.marque, p.denom, p.fx, p.ean, p.qte, p.stock, ana, (p.noms || []).join('|'), p.statut, rep, p.note, new Date(p.t).toISOString()].map(propre).join('\t');
+  return [p.id, p.feuille, p.magasin, p.marque, p.denom, p.fx, p.ean, p.qte, p.stock, ana, (p.noms || []).join('|'), p.statut, rep, p.note, new Date(p.t).toISOString(), p.ce || ''].map(propre).join('\t');
 }
 function faireTsv(l, appareil) {
   var t = ['#BACTERIO-RETOUR\t1\t' + propre(PACK.feuille) + '\t' + PACK.id + '\t' + propre(appareil) + '\t' + new Date().toISOString(),
-    'id\tfeuille\tmagasin\tmarque\tdenomination\tfoodex\tean\tqte\tstock\tanalyses\tphotos\tstatut\treprise\tnote\tdate'];
+    'id\tfeuille\tmagasin\tmarque\tdenomination\tfoodex\tean\tqte\tstock\tanalyses\tphotos\tstatut\treprise\tnote\tdate\tce'];
   l.forEach(function (p) { t.push(ligneTsv(p)); });
   return t.join('\r\n') + '\r\n';
 }
