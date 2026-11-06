@@ -1,10 +1,10 @@
 /* BACTERIO terrain : fonctionne hors ligne (les écrans sont gardés sur le téléphone).
    Les données saisies ne passent jamais par ce fichier : elles restent dans le téléphone. */
-var VERSION = 'bacterio-terrain-v1.2.0';
+var VERSION = 'bacterio-terrain-v1.3.0';
 var FICHIERS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', function (e) {
-  e.waitUntil(caches.open(VERSION).then(function (c) { return c.addAll(FICHIERS); }).then(function () { return self.skipWaiting(); }));
+  e.waitUntil(caches.open(VERSION).then(function (c) { return c.addAll(FICHIERS.map(function (u) { return new Request(u, { cache: 'reload' }); })); }).then(function () { return self.skipWaiting(); }));
 });
 
 self.addEventListener('activate', function (e) {
@@ -20,7 +20,7 @@ self.addEventListener('fetch', function (e) {
   // écrans : d'abord ceux du téléphone (hors ligne), mis à jour en arrière-plan quand le réseau est là
   e.respondWith(caches.open(VERSION).then(function (c) {
     return c.match(e.request, { ignoreSearch: true }).then(function (gardé) {
-      var reseau = fetch(e.request).then(function (rep) {
+      var reseau = fetch(e.request, { cache: 'no-cache' }).then(function (rep) {
         if (rep && rep.ok) c.put(e.request, rep.clone());
         return rep;
       }).catch(function () { return gardé; });
