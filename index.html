@@ -107,6 +107,20 @@ nav.onglets svg{width:24px;height:24px}
 .groupe{display:flex;flex-direction:column;gap:8px}
 .groupe>h3{font-size:15px;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
 .heure{font-variant-numeric:tabular-nums;font-weight:800;color:var(--violet-t);font-size:13px;min-width:44px}
+.ana.gris{opacity:.5;border-left-color:var(--champ-bord)}
+.ana.gris .case{border-style:dashed}
+.ana .forcer{min-height:36px;padding:0 12px;border-radius:10px;border:1.5px solid var(--brun);background:transparent;color:var(--brun);font:inherit;font-size:13px;font-weight:800;cursor:pointer;opacity:1}
+.ana.gris .forcer{opacity:1}
+.lien{background:none;border:none;color:var(--violet-t);font:inherit;font-weight:800;font-size:14px;cursor:pointer;padding:4px 0;text-decoration:underline}
+.besoin{font-size:13px;font-weight:800;text-align:center;border-radius:10px;padding:6px 10px;display:none}
+.besoin.ok{display:block;background:var(--vert-l);color:var(--vert-t)}
+.besoin.court{display:block;background:var(--ambre-l);color:var(--brun)}
+.item.caddie{cursor:default;align-items:flex-start}
+.item.caddie.on{background:var(--vert-l)}
+.case-caddie{width:40px;height:40px;flex:none;border-radius:12px;border:2px solid var(--champ-bord);background:var(--champ);color:#fff;font-size:22px;font-weight:900;cursor:pointer}
+.item.caddie.on .case-caddie{background:var(--vert);border-color:var(--vert)}
+.caddie-txt{flex:1;min-width:0;background:none;border:none;text-align:left;color:var(--ink);font:inherit;cursor:pointer;display:flex;flex-direction:column;gap:2px;padding:0}
+.qte-caddie{font-size:20px;white-space:nowrap}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 @media (min-width:900px){
   .cote{display:flex;flex-direction:column;gap:16px;width:300px;flex:none;background:var(--hero);color:var(--hero-ink);padding:24px 18px;min-height:100vh;position:sticky;top:0}
@@ -174,6 +188,7 @@ nav.onglets svg{width:24px;height:24px}
       <div class="rangee"><button class="btn btn-contour" style="min-height:44px;width:44px;padding:0" data-aller="accueil" aria-label="Retour">‹</button><div><div class="muet">Magasin en cours</div><h1 class="titre" id="t-magasin" style="font-size:22px"></h1></div></div>
       <button class="compteur" id="magCompteur" aria-expanded="false" aria-controls="magDetail"></button>
       <div id="magDetail" style="display:none;flex-direction:column;gap:10px"><div class="grille" id="magGrille"></div><div class="legende" id="magLegende"></div></div>
+      <button class="btn btn-contour large" data-aller="recap" style="min-height:48px;font-size:15px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M3 4h2l2.4 11h11l2-8H6.2"/><circle cx="9" cy="19.5" r="1.5"/><circle cx="17" cy="19.5" r="1.5"/></svg>Récap du magasin · contrôler le caddie</button>
       <div class="entre"><span class="sur" style="color:var(--mute)" id="magNb">Produits pris ici</span></div>
       <div class="liste" id="magProduits"></div>
       <div class="rangee" style="margin-top:6px"><button class="btn btn-contour" style="flex:1" id="btnSansCode">Sans code-barres</button><button class="btn btn-ambre grand" style="flex:1.6" data-scanner="1">Scanner</button></div>
@@ -197,6 +212,7 @@ nav.onglets svg{width:24px;height:24px}
       <label class="champ" for="pMarque">Marque<input type="text" id="pMarque" list="dlMarques" autocomplete="off"></label>
       <label class="champ" for="pDenom">Dénomination (avec poids ou volume)<input type="text" id="pDenom" list="dlDenoms" autocomplete="off"></label>
       <datalist id="dlMarques"></datalist><datalist id="dlDenoms"></datalist>
+      <div class="carte" id="prodMatrice" style="display:none;flex-direction:column;gap:6px"></div>
       <div id="prodAlertes" style="display:flex;flex-direction:column;gap:10px"></div>
       <div class="sur" style="color:var(--mute)">Analyses pour ce produit</div>
       <div class="liste" id="prodAnalyses"></div>
@@ -216,7 +232,18 @@ nav.onglets svg{width:24px;height:24px}
       <input type="file" id="fichierPhoto" accept="image/*" capture="environment" multiple class="sr">
       <label class="rangee" style="font-size:15px;font-weight:600"><input type="checkbox" id="pCompleter" style="width:22px;height:22px;accent-color:#8A4A06"> À compléter au bureau (Scanner)</label>
       <button class="btn btn-danger large" id="btnSupprimer" style="display:none">Supprimer ce produit</button>
-      <div class="barre-bas"><span class="muet" id="resumeFiche" style="text-align:center;font-size:13px"></span><button class="btn btn-vert grand large" id="btnEnregistrer">Ajouter au planning</button></div>
+      <div class="barre-bas"><div class="besoin" id="besoinFiche"></div><div class="entre"><span class="muet" id="resumeFiche" style="font-size:13px"></span><button class="lien" data-aller="recap">Récap du magasin</button></div><button class="btn btn-vert grand large" id="btnEnregistrer">Ajouter au planning</button></div>
+    </section>
+
+    <!-- RÉCAP DU MAGASIN -->
+    <section class="ecran" id="e-recap" aria-labelledby="t-recap">
+      <div class="rangee"><button class="btn btn-contour" style="min-height:44px;width:44px;padding:0" data-aller="magasin" aria-label="Retour au magasin">‹</button><div><div class="muet">Récap du magasin</div><h1 class="titre" id="t-recap" style="font-size:22px"></h1></div></div>
+      <div class="grille" id="recChiffres" style="grid-template-columns:repeat(3,minmax(0,1fr))"></div>
+      <div id="recProblemes" style="display:flex;flex-direction:column;gap:8px"></div>
+      <div class="entre"><span class="sur" style="color:var(--mute)">Mon caddie · cochez chaque article</span><button class="lien" id="btnCaddieVider">tout décocher</button></div>
+      <div class="liste" id="recListe"></div>
+      <div><div class="sur" style="color:var(--mute);margin-bottom:8px">Reste à trouver (planning)</div><div class="puces" id="recReste"></div></div>
+      <div class="rangee"><button class="btn btn-contour" style="flex:1" data-aller="magasin">Retour au magasin</button><button class="btn btn-ambre" style="flex:1.4" data-scanner="1">Scanner un produit</button></div>
     </section>
 
     <!-- AUJOURD'HUI -->
@@ -261,7 +288,7 @@ nav.onglets svg{width:24px;height:24px}
 
 <script>
 'use strict';
-var APP_VERSION = '1.4.0';
+var APP_VERSION = '1.5.0';
 /* ======================= stockage (IndexedDB) ======================= */
 var DB = null;
 function ouvrirBase() {
@@ -397,7 +424,7 @@ function choisirPlanning(i) {
   // plusieurs plannings dans un même pack : on affiche celui choisi (analyses, lignes, stock)
   var pl = PACK && PACK.plannings && PACK.plannings[i];
   if (!pl) return;
-  PACK.feuille = pl.feuille; PACK.titre = pl.titre; PACK.stock = pl.stock; PACK.analyses = pl.analyses; PACK.lignes = pl.lignes;
+  PACK.feuille = pl.feuille; PACK.titre = pl.titre; PACK.stock = pl.stock; PACK.analyses = pl.analyses; PACK.lignes = pl.lignes; PACK.matrices = pl.matrices || [];
   PACK.choix = i;
 }
 function dejaAnalyse(col) {
@@ -435,6 +462,7 @@ function aller(e, depuisHistorique) {
   if (e === 'magasin') dessinerMagasin();
   if (e === 'retour') dessinerRetour();
   if (e === 'jour') dessinerJour();
+  if (e === 'recap') dessinerRecapMag();
 }
 document.addEventListener('click', function (ev) {
   var b = ev.target.closest('[data-aller],[data-scanner]');
@@ -453,7 +481,7 @@ function lireFiche() {
 }
 function signature() {
   lireFiche();
-  return JSON.stringify([FORM.marque, FORM.denom, FORM.qte, FORM.stock, FORM.ce, FORM.statut, Object.keys(FORM.ana).sort().map(function (k) { return k + ':' + FORM.ana[k]; }), FORM.photos.slice().sort(), FORM.reprise.slice().sort()]);
+  return JSON.stringify([FORM.marque, FORM.denom, FORM.qte, FORM.stock, FORM.ce, FORM.statut, Object.keys(FORM.ana).sort().map(function (k) { return k + ':' + FORM.ana[k]; }), FORM.photos.slice().sort(), FORM.reprise.slice().sort(), FORM.matChoix ? FORM.matrice : '', (FORM.force || []).slice().sort()]);
 }
 function surFiche() { return !!FORM && $('e-produit').classList.contains('actif'); }
 function ficheModifiee() { return surFiche() && signature() !== SIG; }
@@ -544,7 +572,7 @@ $('fichierPack').addEventListener('change', function () {
     var t = String(lr.result || '').replace(/^﻿/, ''), p;
     try { p = JSON.parse(t); } catch (e) { toast('Ce fichier n\'est pas un pack terrain lisible.'); return; }
     if (!p || p.type !== 'bacterio-pack' || !p.analyses) { toast('Ce fichier n\'est pas un pack terrain BACTERIO.'); return; }
-    if (p.v > 2) toast('Pack d\'une version plus récente : mettez l\'application à jour.', 4000);
+    if (p.v > 3) toast('Pack d\'une version plus récente : mettez l\'application à jour.', 4000);
     kvEcrire('pack', p).then(function () {
       kvEcrire('planning', 0); installerPack(p, 0); MAG = ''; aller('accueil');
       var np = (p.plannings || []).length;
@@ -626,7 +654,7 @@ function dessinerMagasin() {
   var excel = (PACK.lignes || []).filter(function (x) { return norm(x.mg) === norm(MAG); });
   $('magNb').textContent = 'Produits pris ici · ' + (ici.length + excel.length);
   $('magProduits').innerHTML = ici.map(function (p) {
-    return '<button class="ligne-prod' + (p.statut === 'completer' ? ' completer' : '') + '" data-edit="' + p.id + '"><span class="entre"><b>' + esc(p.denom || 'Produit sans nom') + '</b><span class="muet">× ' + (p.qte || 0) + '</span></span><span class="puces" style="gap:6px">' + etiquettes(p.ana) + (p.statut === 'completer' ? '<span class="pastille p-ambre">à compléter au bureau</span>' : '') + '<span class="muet" style="font-size:12px">' + esc(p.marque) + (p.photos.length ? ' · ' + p.photos.length + ' photo(s)' : '') + (p.ce ? ' · C/E ' + esc(p.ce) : '') + '</span></span></button>';
+    return '<button class="ligne-prod' + (p.statut === 'completer' ? ' completer' : '') + '" data-edit="' + p.id + '"><span class="entre"><b>' + esc(p.denom || 'Produit sans nom') + '</b><span class="muet">× ' + (p.qte || 0) + '</span></span><span class="puces" style="gap:6px">' + etiquettes(p.ana) + (p.statut === 'completer' ? '<span class="pastille p-ambre">à compléter au bureau</span>' : '') + (p.alerteQte ? '<span class="pastille p-ambre">qté &lt; minimum</span>' : '') + (p.force && p.force.length ? '<span class="pastille p-ambre">analyse forcée</span>' : '') + '<span class="muet" style="font-size:12px">' + esc(p.marque) + (p.matrice ? ' · ' + esc(p.matrice) : '') + (p.photos.length ? ' · ' + p.photos.length + ' photo(s)' : '') + (p.ce ? ' · C/E ' + esc(p.ce) : '') + '</span></span></button>';
   }).join('') + excel.map(function (x) {
     var a = {}; (x.a || []).forEach(function (c) { a[c[0]] = c[1]; });
     return '<div class="ligne-prod" style="opacity:.75;cursor:default"><span class="entre"><b>' + esc(x.d) + '</b><span class="pastille p-gris">déjà dans Excel</span></span><span class="puces" style="gap:6px">' + etiquettes(a) + '</span></div>';
@@ -853,11 +881,12 @@ function ouvrirProduit(existant, code, brouillon) {
     FORM = JSON.parse(JSON.stringify(existant)); EDIT = existant.id;
   } else {
     EDIT = null;
-    FORM = { id: uid(), pack: PACK.id, feuille: PACK.feuille, magasin: MAG, marque: '', denom: '', fx: '', ean: code || '', qte: 0, stock: '', ana: {}, photos: [], statut: 'ok', reprise: [], note: '', ce: '', t: Date.now(), exporte: false, trouve: false };
+    FORM = { id: uid(), pack: PACK.id, feuille: PACK.feuille, magasin: MAG, marque: '', denom: '', fx: '', ean: code || '', qte: 0, stock: '', ana: {}, photos: [], statut: 'ok', reprise: [], note: '', ce: '', t: Date.now(), exporte: false, trouve: false, matrice: '', matChoix: false, force: [], alerteQte: '', qteOk: '' };
     var b = code ? BASE[code] : null;
     if (b) { FORM.marque = b[1] || ''; FORM.denom = b[2] || ''; FORM.fx = b[3] || ''; FORM.trouve = true; if (b[4] && FORM.denom.indexOf(b[4]) < 0 && /\d/.test(b[4])) FORM.denom = (FORM.denom + ' ' + b[4]).trim(); }
     else if (code) FORM.statut = 'completer';
   }
+  FORM.force = FORM.force || []; FORM.matOuvert = false; chargerFx();
   $('prodMag').textContent = FORM.magasin + ' · ' + PACK.feuille.split(' - ')[0];
   $('t-produit').textContent = existant ? 'Modifier le produit' : (FORM.trouve ? 'Produit reconnu' : (FORM.ean ? 'Code inconnu' : 'Produit sans code-barres'));
   $('pMarque').value = FORM.marque; $('pDenom').value = FORM.denom;
@@ -937,11 +966,16 @@ function dessinerAnalyses() {
   $('prodAlertes').innerHTML = al.join('');
   var b = bilan(), restes = {};
   b.reste.forEach(function (x) { restes[x.a.col] = x.r; });
-  $('prodAnalyses').innerHTML = PACK.analyses.map(function (a) {
+  reconnaitreMatrice(); dessinerMatrice();
+  var mat = FORM.matrice ? matriceDe(FORM.matrice) : null;
+  var liste = PACK.analyses.slice().sort(function (x, y) { return (compatible(x.col) ? 0 : 1) - (compatible(y.col) ? 0 : 1); });
+  $('prodAnalyses').innerHTML = liste.map(function (a) {
     var on = FORM.ana[a.col] > 0, h = histPourAnalyse(rows, a), confirme = FORM.reprise.indexOf(a.col) >= 0;
-    var r = restes[a.col] || 0;
-    var info = (a.labo ? '<span class="point" style="--c:' + couleurLabo(a.labo) + '"></span>' : '') + esc([a.labo, a.poids].filter(Boolean).join(' · ')) + (r > 0 ? ' · reste ' + r : ' · complet');
-    var bloc = '<div class="ana' + (on ? ' on' : '') + '" style="--c:' + couleurLabo(a.labo) + '"><button class="case" data-ana="' + a.col + '" aria-pressed="' + on + '" aria-label="' + esc(a.nom) + '">' + (on ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>' : '') + '</button><span class="nom"><b>' + esc(a.nom) + (a.separe ? ' <span class="pastille p-ambre" style="padding:2px 7px">séparé</span>' : '') + '</b><span>' + info + '</span></span>' +
+    var r = restes[a.col] || 0, force = FORM.force.indexOf(a.col) >= 0, gris = !compatible(a.col) && !force, bes = besoinAnalyse(a);
+    var rappel = (bes.n ? bes.n + ' pièce(s)' : '') + (bes.q ? (bes.n ? ' · ' : '') + 'min ' + texteQ(bes.q, bes.u) : '') + (bes.panels.length ? ' · ' + bes.panels.join(', ') : '');
+    var info = (a.labo ? '<span class="point" style="--c:' + couleurLabo(a.labo) + '"></span>' : '') + esc([a.labo, rappel || a.poids].filter(Boolean).join(' · ')) + (r > 0 ? ' · reste ' + r : ' · complet') + (gris ? '<br><b style="color:var(--brun)">Pas prévu pour : ' + esc(mat.n) + '</b>' : '');
+    var bloc = '<div class="ana' + (on ? ' on' : '') + (gris ? ' gris' : '') + '" style="--c:' + couleurLabo(a.labo) + '"><button class="case" data-ana="' + a.col + '" aria-pressed="' + on + '" aria-label="' + esc(a.nom) + '">' + (on ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>' : '') + '</button><span class="nom"><b>' + esc(a.nom) + (a.separe ? ' <span class="pastille p-ambre" style="padding:2px 7px">séparé</span>' : '') + (force ? ' <span class="pastille p-ambre" style="padding:2px 7px">forcée</span>' : '') + '</b><span>' + info + '</span></span>' +
+      (gris ? '<button class="forcer" data-forcer="' + a.col + '">Forcer</button>' : '') +
       (on ? '<button class="pas" data-moins="' + a.col + '" aria-label="Moins">−</button><b style="width:24px;text-align:center">' + FORM.ana[a.col] + '</b><button class="pas" data-plus="' + a.col + '" aria-label="Plus">+</button>' : '') + '</div>';
     if (h.length && !confirme) {
       var ex = h[0];
@@ -955,12 +989,20 @@ function dessinerAnalyses() {
   majQte();
 }
 document.addEventListener('click', function (ev) {
-  var t = ev.target.closest('[data-ana],[data-plus],[data-moins],[data-reprendre]');
+  var t = ev.target.closest('[data-ana],[data-plus],[data-moins],[data-reprendre],[data-forcer]');
   if (!t || !FORM) return;
   var col;
+  if (t.hasAttribute('data-forcer')) {
+    col = +t.getAttribute('data-forcer');
+    if (FORM.force.indexOf(col) < 0) FORM.force.push(col);
+    FORM.ana[col] = FORM.ana[col] || 1; FORM.qteAuto = true;
+    toast('Analyse forcée : elle sera signalée dans Excel.');
+    dessinerAnalyses(); return;
+  }
   if (t.hasAttribute('data-ana')) {
     col = +t.getAttribute('data-ana');
-    if (FORM.ana[col] > 0) { delete FORM.ana[col]; }
+    if (FORM.ana[col] > 0) { delete FORM.ana[col]; FORM.force = FORM.force.filter(function (x) { return x !== col; }); }
+    else if (!compatible(col) && FORM.force.indexOf(col) < 0) { toast('Pas prévu pour cette matrice : touchez « Forcer » si c\'est voulu.', 3500); return; }
     else {
       var a = PACK.analyses.filter(function (x) { return x.col === col; })[0];
       var h = histPourAnalyse(historiqueProduit(), a);
@@ -968,7 +1010,7 @@ document.addEventListener('click', function (ev) {
       FORM.ana[col] = 1;
     }
   } else if (t.hasAttribute('data-plus')) { col = +t.getAttribute('data-plus'); FORM.ana[col] = Math.min(99, (FORM.ana[col] || 0) + 1); }
-  else if (t.hasAttribute('data-moins')) { col = +t.getAttribute('data-moins'); FORM.ana[col] = (FORM.ana[col] || 1) - 1; if (FORM.ana[col] <= 0) delete FORM.ana[col]; }
+  else if (t.hasAttribute('data-moins')) { col = +t.getAttribute('data-moins'); FORM.ana[col] = (FORM.ana[col] || 1) - 1; if (FORM.ana[col] <= 0) { delete FORM.ana[col]; FORM.force = FORM.force.filter(function (x) { return x !== col; }); } }
   else { col = +t.getAttribute('data-reprendre'); if (FORM.reprise.indexOf(col) < 0) FORM.reprise.push(col); FORM.ana[col] = FORM.ana[col] || 1; }
   FORM.qteAuto = true;
   dessinerAnalyses();
@@ -982,10 +1024,11 @@ function majQte() {
 function avertQte() {
   if (!FORM) return;
   var s = sommeAna(), n = Object.keys(FORM.ana).length, q = parseInt($('pQte').value, 10) || 0, a = $('qteAvert');
-  if (n && q === 0) { a.style.display = 'block'; a.textContent = 'Quantité achetée à 0 alors que ' + n + ' analyse(s) sont cochées.'; }
-  else if (n && q < s) { a.style.display = 'block'; a.textContent = s + ' échantillon(s) coché(s) pour ' + q + ' unité(s) achetée(s).'; }
-  else a.style.display = 'none';
+  a.style.display = 'none';   // remplacé par le bandeau « Demandé : … » (pièces, poids, volume)
   $('resumeFiche').textContent = n ? n + ' analyse(s) · ' + s + ' échantillon(s) · ' + q + ' unité(s)' : 'Cochez au moins une analyse';
+  var v = n ? verifQte() : null, z = $('besoinFiche');
+  if (!v || (!v.nTot && !v.qTot)) { z.className = 'besoin'; z.textContent = ''; }
+  else { z.className = 'besoin ' + (v.court ? 'court' : 'ok'); z.textContent = 'Demandé : ' + v.nTot + ' pièce(s)' + (v.qTot ? ' · min ' + texteQ(v.qTot, v.uTot) : '') + ' — vous : ' + q + (v.achete ? ' (≈ ' + texteQ(v.achete, v.uTot) + ')' : '') + (v.court ? '' : ' ✓'); }
 }
 $('pQte').addEventListener('input', function () { FORM.qteAuto = false; avertQte(); });
 
@@ -1045,19 +1088,20 @@ function enregistrer(suite, qteVue) {
   var sep = cols.filter(function (c) { var a = PACK.analyses.filter(function (x) { return x.col === c; })[0]; return a && a.separe; });
   if (sep.length && cols.length > 1) { toast('Échantillon séparé : ce produit ne peut servir qu\'à une seule analyse. Prenez un autre paquet pour les autres.', 5000); return; }
   if (!FORM.denom && !FORM.photos.length) { toast('Donnez au moins une dénomination ou une photo.'); return; }
-  var s = sommeAna();
-  if (!qteVue && (FORM.qte === 0 || FORM.qte < s)) {
-    modale(FORM.qte === 0 ? 'Quantité achetée à 0' : 'Quantité plus petite que les échantillons',
-      '<p>' + cols.length + ' analyse(s) cochée(s), soit ' + s + ' échantillon(s), pour <b>' + FORM.qte + '</b> unité(s) achetée(s).</p>', [
-      { t: 'Mettre ' + s + ' et enregistrer', cls: 'btn-vert', f: function () { $('pQte').value = s; FORM.qteAuto = false; enregistrer(suite, true); } },
-      { t: 'Enregistrer avec ' + FORM.qte, cls: 'btn-contour', f: function () { enregistrer(suite, true); } },
-      { t: 'Corriger la quantité', cls: 'btn-contour', f: function () { $('pQte').focus(); } }
+  // quantité sous le minimum (pièces, poids ou volume demandés, mycotoxines : 3 pièces) : un seul message, non bloquant
+  var v = verifQte();
+  if (!qteVue && v.court && FORM.qteOk !== v.sig) {
+    modale('Quantité en dessous du minimum', '<p>' + v.lignes.join('</p><p>') + '</p>', [
+      { t: 'Oui, sûr', cls: 'btn-vert', f: function () { FORM.qteOk = v.sig; FORM.alerteQte = v.resume; enregistrer(suite, true); } },
+      { t: 'Corriger', cls: 'btn-contour', f: function () { $('pQte').focus(); } }
     ]);
     return;
   }
+  FORM.alerteQte = v.court ? (FORM.alerteQte || v.resume) : '';
+  if (!v.court) FORM.qteOk = '';
   if (!FORM.denom || !FORM.marque) FORM.statut = 'completer';
   FORM.t = FORM.t || Date.now(); FORM.exporte = false;
-  var p = JSON.parse(JSON.stringify(FORM)); delete p.qteAuto;
+  var p = JSON.parse(JSON.stringify(FORM)); delete p.qteAuto; delete p.matOuvert;
   var orig = EDIT ? PRODUITS.filter(function (x) { return x.id === EDIT; })[0] : null;
   ecrireProduit(p).then(function () {
     // photos retirées pendant la modification : effacées maintenant que c'est enregistré
@@ -1088,6 +1132,299 @@ $('btnProdRetour').addEventListener('click', function () {
   garde(function () { aller(MAG ? 'magasin' : 'accueil'); });
 });
 
+/* ======================= matrices, FoodEx2 et quantités (1.5) ======================= */
+/* catalogue FoodEx2 de l'EFSA (MTX) : parent de chaque code et libellé anglais ; chargé une fois, gardé hors ligne */
+var FX = null;
+function chargerFx() {
+  if (FX) return Promise.resolve(FX);
+  if (!chargerFx.p) chargerFx.p = fetch('fx.json').then(function (r) { return r.json(); }).then(function (j) { FX = j; if (FORM && surFiche()) dessinerAnalyses(); return j; }).catch(function () { FX = { p: {}, n: {} }; return FX; });
+  return chargerFx.p;
+}
+function ancetres(code) { var l = [], c = String(code || '').toUpperCase(), n = 0; while (c && n < 14) { l.push(c); c = FX && FX.p ? FX.p[c] : null; n++; } return l; }
+function nomFx(code) { if (!FX || !code) return ''; var a = ancetres(code); for (var i = 0; i < a.length; i++) if (FX.n[a[i]]) return FX.n[a[i]]; return ''; }
+
+/* mots des aliments en plusieurs langues (français, anglais, allemand, luxembourgeois, portugais, néerlandais, italien, espagnol)
+   ramenés à un même concept : « avoine », « oats », « Hafer », « aveia » -> OAT */
+var DICO_SRC = [
+  'OAT:avoine,oat,oats,hafer,haver,aveia,avena,hawer,haferflocken,havermout,porridge',
+  'WHEAT:ble,froment,wheat,weizen,trigo,frumento,tarwe,weess',
+  'RYE:seigle,rye,roggen,rogge,centeio,segale,centeno,kar',
+  'BARLEY:orge,barley,gerste,gerst,cevada,orzo,cebada',
+  'MAIZE:mais,maize,corn,popcorn,milho,granturco,polenta,cornflakes,tortilla',
+  'RICE:riz,rice,reis,rijst,arroz,riso',
+  'SPELT:epeautre,spelt,dinkel,espelta,farro',
+  'BUCKWHEAT:sarrasin,buckwheat,buchweizen,boekweit,trigo sarraceno,grano saraceno',
+  'MILLET:millet,hirse,milheto,miglio,mijo,gierst',
+  'QUINOA:quinoa,quinua',
+  'CEREAL:cereale,cereales,cereal,cereals,getreide,granen,cereais,cereali,crispies,pops',
+  'FLAKES:flocon,flocons,flakes,flake,flocken,vlokken,flocos,fiocchi,copos',
+  'MUESLI:muesli,musli,granola,crunchy,crunch,porridge mix',
+  'BREAKFAST:petit dejeuner,dejeuner,breakfast,fruhstuck,ontbijt,pequeno almoco,colazione,desayuno',
+  'FLOUR:farine,flour,mehl,meel,farinha,farina,harina',
+  'BREAD:pain,pains,bread,brot,brood,pao,pane,pan,baguette,brotchen,toast,biscotte,biscottes,rusk,rusks,knackebrot,crispbread,brioche,croissant,viennoiserie',
+  'BISCUIT:biscuit,biscuits,cookie,cookies,keks,kekse,koekje,koekjes,bolacha,bolachas,biscotti,galleta,galletas,sable,gaufrette,wafer,cracker,crackers,speculoos',
+  'CAKE:gateau,gateaux,cake,cakes,kuchen,taart,bolo,torta,pastel,patisserie,muffin,madeleine,quatre quarts',
+  'PASTA:pates,pasta,nudeln,noodles,nouilles,massa,spaghetti,macaroni,tagliatelle,penne,fusilli,lasagne,vermicelle',
+  'MILK:lait,milk,milch,melk,leite,latte,leche,mellech',
+  'CHEESE:fromage,cheese,kase,kaas,queijo,formaggio,queso,kéis,emmental,gouda,camembert,brie,mozzarella,parmesan,comte,feta',
+  'YOGHURT:yaourt,yogourt,yoghurt,yogurt,joghurt,iogurte,skyr',
+  'BUTTER:beurre,butter,boter,manteiga,burro,mantequilla',
+  'CREAM:creme,cream,sahne,room,natas,panna,nata',
+  'EGG:oeuf,oeufs,egg,eggs,ei,eier,eieren,ovo,ovos,uovo,uova,huevo,huevos',
+  'MEAT:viande,meat,fleisch,vlees,carne,fleesch',
+  'PORK:porc,pork,pig,schwein,varken,porco,maiale,cerdo,jambon,ham,schinken,lard,bacon,lardons',
+  'BEEF:boeuf,beef,bovine,rind,rindfleisch,rund,vaca,manzo,veau,veal,kalb',
+  'POULTRY:volaille,poultry,poulet,chicken,huhn,hahnchen,kip,frango,pollo,dinde,turkey,pute,canard,duck',
+  'SAUSAGE:saucisse,saucisson,sausage,wurst,worst,salsicha,salsiccia,salame,salami,chorizo,merguez',
+  'FISH:poisson,fish,fisch,vis,peixe,pesce,pescado,saumon,salmon,lachs,zalm,thon,tuna,thunfisch,tonijn,atum,tonno,cabillaud,cod,sardine,maquereau,mackerel,hareng,herring,truite,trout,colin,merlu',
+  'SHELLFISH:crevette,crevettes,shrimp,shrimps,prawn,prawns,garnele,garnalen,camarao,gamberi,moule,moules,mussel,mussels,muschel,mosselen,huitre,huitres,oyster,oysters,crustaces,mollusques,calamar,squid,poulpe,octopus',
+  'FRUIT:fruit,fruits,obst,frucht,fruchte,fruta,frutas,frutta,uebst',
+  'VEGETABLE:legume,legumes,vegetable,vegetables,gemuse,groente,groenten,legumes,verdura,verduras,verdure,geméis',
+  'APPLE:pomme,pommes,apple,apples,apfel,appel,maca,mela,manzana,apel,compote',
+  'PEAR:poire,poires,pear,pears,birne,peer,pera',
+  'GRAPE:raisin,raisins,grape,grapes,traube,trauben,druif,uva,uvas,sultana,sultanas',
+  'CITRUS:orange,oranges,citron,lemon,zitrone,citroen,limao,limone,limon,mandarine,clementine,pamplemousse,grapefruit,agrumes,citrus',
+  'BERRY:fraise,fraises,strawberry,strawberries,erdbeere,aardbei,morango,fragola,fresa,framboise,framboises,raspberry,himbeere,myrtille,myrtilles,blueberry,heidelbeere,cassis,groseille,cranberry,airelle,baies,berries,beeren',
+  'BANANA:banane,bananes,banana,bananas',
+  'TROPICAL:ananas,pineapple,mangue,mango,mangoes,papaye,papaya,kiwi,avocat,avocado,coco,coconut,kokos,noix de coco',
+  'STONEFRUIT:peche,peches,peach,pfirsich,perzik,pessego,pesca,abricot,apricot,aprikose,abrikoos,damasco,albicocca,prune,plum,pflaume,pruim,ameixa,cerise,cherry,kirsche,kers,cereja,ciliegia,nectarine',
+  'DRIEDFRUIT:fruits secs,dried fruit,trockenobst,gedroogd,figue,figues,fig,figs,datte,dattes,date,dates,pruneau,pruneaux,prunes',
+  'TOMATO:tomate,tomates,tomato,tomatoes,tomaten,pomodoro,ketchup,passata',
+  'POTATO:pomme de terre,pommes de terre,potato,potatoes,kartoffel,kartoffeln,aardappel,batata,patata,patate,frites,fries,chips,crisps,gromperen',
+  'LEAFY:salade,laitue,lettuce,salat,sla,alface,lattuga,lechuga,epinard,epinards,spinach,spinat,spinazie,espinafre,spinaci,roquette,rucola,mache,chou,cabbage,kohl,kool,couve,cavolo',
+  'ROOT:carotte,carottes,carrot,carrots,karotte,mohre,wortel,cenoura,carota,zanahoria,betterave,celeri,radis,navet',
+  'ONION:oignon,oignons,onion,onions,zwiebel,ui,uien,cebola,cipolla,cebolla,ail,garlic,knoblauch,knoflook,alho,aglio,ajo,poireau,leek,lauch,prei',
+  'PEPPER:poivron,poivrons,piment,paprika,chili,pepper,peppers,peperoni,pimento,pimiento',
+  'MUSHROOM:champignon,champignons,mushroom,mushrooms,pilz,pilze,paddenstoel,cogumelo,funghi,setas,seta',
+  'PULSE:legumineuse,legumineuses,pulses,legumes secs,lentille,lentilles,lentil,lentils,linse,linsen,linzen,lentilha,lenticchie,lentejas,pois chiche,pois chiches,chickpea,chickpeas,kichererbsen,grao,ceci,garbanzo,haricot,haricots,bean,beans,bohne,bohnen,bonen,feijao,fagioli,frijol,frijoles,pois,peas,erbsen,erwten,ervilha,piselli,guisantes,houmous,hummus',
+  'SOY:soja,soya,soy,soybean,soybeans,tofu,tempeh,edamame',
+  'NUT:noix,nut,nuts,nuss,nusse,noot,noten,noz,nozes,noci,nueces,noisette,noisettes,hazelnut,hazelnuts,haselnuss,hazelnoot,avela,nocciola,avellana,amande,amandes,almond,almonds,mandel,mandeln,amandel,amendoa,mandorla,almendra,pistache,pistachio,pistazie,cajou,cashew,pecan,macadamia,chataigne,marron,chestnut',
+  'PEANUT:arachide,arachides,cacahuete,cacahuetes,peanut,peanuts,erdnuss,erdnusse,pinda,pindas,amendoim,arachidi,cacahuete,mani,pindakaas',
+  'SEED:graine,graines,seed,seeds,samen,zaden,sementes,semi,semillas,sesame,sesam,sesamo,lin,linseed,flax,leinsamen,lijnzaad,linhaca,tournesol,sunflower,sonnenblume,zonnebloem,girassol,girasole,girasol,courge,pumpkin,kurbis,chia,pavot,poppy,mohn',
+  'OIL:huile,huiles,oil,oils,ol,olie,azeite,oleo,olio,aceite,olive,olives,olijf,oliva,azeitona,colza,rapeseed,raps,margarine',
+  'SPICE:epice,epices,spice,spices,gewurz,gewurze,specerij,especiaria,spezie,especias,cannelle,cinnamon,zimt,curry,curcuma,turmeric,cumin,kreuzkummel,muscade,nutmeg,poivre,pfeffer,peper,pimenta,pepe,pimienta,gingembre,ginger,ingwer,gember,gengibre,zenzero,jengibre,safran,saffron,vanille,vanilla',
+  'HERB:herbe,herbes,herb,herbs,krauter,kruiden,ervas,erbe,hierbas,basilic,basil,persil,parsley,thym,thyme,origan,oregano,romarin,rosemary,menthe,mint,ciboulette,aneth,dill',
+  'TEA:the,tea,tee,thee,cha,te,infusion,tisane,kräutertee,matcha,rooibos',
+  'COFFEE:cafe,coffee,kaffee,koffie,caffe,espresso,expresso,arabica,robusta,cappuccino,kaffi',
+  'COCOA:cacao,cocoa,kakao,cacau',
+  'CHOCOLATE:chocolat,chocolate,schokolade,chocolade,cioccolato,schokela,praline,pralines,nutella',
+  'SUGAR:sucre,sugar,zucker,suiker,acucar,zucchero,azucar,sirop,syrup,sirup,stroop,xarope,sciroppo,jarabe',
+  'HONEY:miel,honey,honig,honing,mel,miele',
+  'JAM:confiture,confitures,jam,marmelade,marmalade,konfitur,jam,doce,compota,marmellata,mermelada,gelee,pate a tartiner,spread,aufstrich',
+  'CONFECTIONERY:bonbon,bonbons,candy,candies,sweets,susswaren,snoep,doces,caramelle,golosinas,caramel,reglisse,liquorice,lakritz,drop,guimauve,marshmallow,chewing gum,gum,dragee,nougat,confiserie,confectionery',
+  'JUICE:jus,juice,saft,sap,sumo,succo,zumo,nectar,smoothie',
+  'SOFTDRINK:soda,sodas,limonade,lemonade,limo,cola,refrigerante,bibita,refresco,gazeuse,gazeux,carbonated,sparkling,kohlensaure,sprudel,prik,gaseificada,gassata,gaseosa,energy,energisant,energetique,ice tea',
+  'BEVERAGE:boisson,boissons,beverage,beverages,drink,drinks,getrank,getranke,drank,dranken,bebida,bebidas,bevanda,bevande,gedrenks',
+  'WATER:eau,eaux,water,wasser,agua,acqua,mineral,minerale,mineralwasser,spa',
+  'BEER:biere,bieres,beer,bier,cerveja,birra,cerveza,beier',
+  'WINE:vin,vins,wine,wein,wijn,vinho,vino,crémant,cremant,champagne,mousseux,prosecco,cava',
+  'SPIRIT:alcool,spiritueux,spirit,spirits,liqueur,likor,likeur,licor,liquore,whisky,vodka,rhum,rum,gin,cognac,schnaps,eau de vie,cidre,cider,apfelwein',
+  'SAUCE:sauce,sauces,sosse,saus,molho,salsa,mayonnaise,moutarde,mustard,senf,mosterd,mostarda,senape,mostaza,vinaigrette,dressing,pesto',
+  'VINEGAR:vinaigre,vinegar,essig,azijn,vinagre,aceto',
+  'SALT:sel,salt,salz,zout,sal,sale',
+  'SOUP:soupe,soupes,potage,veloute,soup,soups,suppe,soep,sopa,zuppa,minestrone,bouillon,broth,bruhe',
+  'INFANT:bebe,bebes,nourrisson,nourrissons,infant,infants,baby,babies,saugling,zuigeling,bebe,neonato,lactante,enfant,enfants,child,children,kinder,kind,kinderen,crianca,criancas,bambini,bambino,ninos,kanner,kids,junior,juniors,croissance,growing up',
+  'FORMULA:preparation,preparations,formula,formulae,folgemilch,opvolgmelk,leite de transicao,latte di proseguimento,lait infantile,lait de suite,lait 1er age,lait 2eme age',
+  'SUPPLEMENT:complement,complements,supplement,supplements,nahrungserganzung,supplementen,suplemento,integratore,suplementos,gelules,capsules,comprimes,tablets,vitamine,vitamins',
+  'SNACK:snack,snacks,apero,aperitif,chips,crisps,cracker,biscuits sales,popcorn,bretzel,pretzel,brezel',
+  'DESSERT:dessert,desserts,glace,glaces,ice cream,eis,ijs,gelado,gelato,helado,sorbet,creme dessert,pudding,flan,mousse,tiramisu',
+  'READYMEAL:plat,plats,plat cuisine,plats cuisines,ready meal,fertiggericht,kant en klaar,prato pronto,piatto pronto,plato preparado,pizza,lasagne,quiche,sandwich,wrap,burger,kebab',
+  'SEAWEED:algue,algues,seaweed,seaweeds,alge,algen,zeewier,algas,alghe,nori,wakame,spiruline,spirulina',
+  'DRIED:sec,secs,seche,seches,sechee,dried,getrocknet,gedroogd,seco,secos,secco,secchi,deshydrate',
+  'FROZEN:surgele,surgeles,congele,frozen,tiefgekuhlt,diepvries,congelado,surgelato,congelados',
+  'SMOKED:fume,fumee,fumes,smoked,geraucht,gerookt,fumado,affumicato,ahumado'
+];
+var DICO = {}, DICO_LONGS = [];
+DICO_SRC.forEach(function (l) {
+  var i = l.indexOf(':'), c = l.slice(0, i);
+  l.slice(i + 1).split(',').forEach(function (m) { var k = norm(m); if (k && !DICO[k]) { DICO[k] = c; if (k.length >= 5 && k.indexOf(' ') < 0) DICO_LONGS.push(k); } });
+});
+var VIDES_CONCEPT = ['PRODUCT', 'PRODUCTS', 'OTHER', 'OTHERS', 'FOOD', 'FOODS', 'BASED', 'MIXED', 'PREPARED', 'AND', 'WITH', 'FOR', 'NOT', 'UNSPECIFIED', 'GENERIC', 'TYPE', 'LIKE', 'PRODUIT', 'PRODUITS', 'AUTRE', 'AUTRES', 'POUR', 'AVEC', 'SANS', 'DIVERS', 'VARIES', 'BIO'];
+function concepts(texte) {
+  var t = ' ' + norm(texte) + ' ', s = {};
+  // expressions de plusieurs mots d'abord (« pomme de terre », « petit dejeuner »)
+  Object.keys(DICO).forEach(function (k) { if (k.indexOf(' ') > 0 && t.indexOf(' ' + k + ' ') >= 0) { s[DICO[k]] = 1; t = t.split(' ' + k + ' ').join(' '); } });
+  t.split(' ').forEach(function (w) {
+    if (!w || /^\d/.test(w)) return;
+    var c = DICO[w] || (w.length > 3 && DICO[w.replace(/(S|X|EN|E|N)$/, '')]);
+    if (!c && w.length >= 7) DICO_LONGS.some(function (k) { if (w.indexOf(k) >= 0) { c = DICO[k]; return true; } return false; });   // mots composés allemands (« Haferflocken »)
+    if (c) s[c] = 1;
+    else if (w.length >= 4 && VIDES_CONCEPT.indexOf(w) < 0) s['~' + w.replace(/S$/, '')] = 1;
+  });
+  return s;
+}
+
+/* matrices du planning affiché (pack v3) */
+function matrices() { return (PACK && PACK.matrices) || []; }
+function matriceDe(nom) { var k = norm(nom); return matrices().filter(function (m) { return norm(m.n) === k; })[0] || null; }
+function conceptsMatrice(m) {
+  if (!m._c) { m._c = concepts(m.n); var e = concepts(nomFx(m.fx)); Object.keys(e).forEach(function (k) { if (k.charAt(0) !== '~') m._c[k] = 1; }); }
+  return m._c;
+}
+var GENERIQUES = ['CEREAL', 'FLAKES', 'FRUIT', 'VEGETABLE', 'MEAT', 'FISH', 'BEVERAGE', 'DRIED', 'FROZEN', 'SMOKED', 'BREAKFAST', 'SNACK', 'SAUCE'];
+function poidsConcept(k) { return k.charAt(0) === '~' ? 0.75 : (GENERIQUES.indexOf(k) >= 0 ? 0.5 : 1); }
+function scoreMatrice(m, P, fx) {
+  // part pondérée des mots de la matrice retrouvés dans le produit (les mots génériques comptent moitié), plus un bonus par mot retrouvé
+  var M = conceptsMatrice(m), tot = 0, ok = 0, sc = 0;
+  Object.keys(M).forEach(function (k) { var w = poidsConcept(k); tot += w; if (P[k]) ok += w; });
+  if (tot) sc = ok / tot + 0.1 * ok;
+  if (fx && m.fx && FX) {
+    if (ancetres(fx).indexOf(m.fx) >= 0) sc = Math.max(sc, 1.2);           // le produit est classé sous la matrice
+    else if (ancetres(m.fx).indexOf(fx) >= 0) sc = Math.max(sc, 0.7);      // la matrice est plus précise que le produit
+  }
+  return sc;
+}
+function classerMatrices() {
+  var P = concepts((FORM.denom || '') + ' ' + nomFx(FORM.fx)), l = matrices().map(function (m) { return { m: m, s: scoreMatrice(m, P, FORM.fx) }; });
+  l.sort(function (a, b) { return b.s - a.s; });
+  return l;
+}
+function reconnaitreMatrice() {
+  // choix du préleveur gardé ; sinon reconnaissance automatique quand elle est nette
+  if (!FORM || !matrices().length || FORM.matChoix) return;
+  var l = classerMatrices();
+  if (matrices().length === 1) { FORM.matrice = matrices()[0].n; FORM.matAuto = true; return; }
+  if (l.length && l[0].s >= 0.5 && (l.length < 2 || l[0].s - l[1].s >= 0.2)) { FORM.matrice = l[0].m.n; FORM.matAuto = true; }
+  else { FORM.matrice = ''; FORM.matAuto = false; }
+}
+function compatible(col) {
+  var m = FORM && FORM.matrice ? matriceDe(FORM.matrice) : null;
+  if (!m) return true;
+  return m.a.some(function (x) { return x[0] === col; });
+}
+function dessinerMatrice() {
+  var z = $('prodMatrice');
+  if (!matrices().length) { z.style.display = 'none'; return; }
+  z.style.display = 'flex';
+  var m = FORM.matrice ? matriceDe(FORM.matrice) : null, h = '';
+  if (m && !FORM.matOuvert) {
+    h = '<div class="entre"><span class="sur" style="color:var(--mute)">Matrice</span><button class="lien" data-mat-changer="1">changer</button></div>' +
+        '<b style="font-size:17px">' + esc(m.n) + '</b><span class="muet" style="font-size:13px">' + (FORM.matChoix ? 'choisie par vous' : 'reconnue d\'après la dénomination') + (m.fx ? ' · FoodEx2 ' + esc(m.fx) : '') + '</span>';
+    var b = bilan(), restes = {}, aussi = [];
+    b.reste.forEach(function (x) { restes[x.a.col] = x.r; });
+    m.a.forEach(function (x) { var a = PACK.analyses.filter(function (y) { return y.col === x[0]; })[0]; if (a && restes[a.col] > 0 && !(FORM.ana[a.col] > 0)) aussi.push(a); });
+    if (aussi.length) h += '<span class="muet" style="font-size:13px;margin-top:4px">Peut aussi servir pour :</span><div class="puces" style="gap:6px">' + aussi.map(function (a) { return '<button class="puce lab" style="--c:' + couleurLabo(a.labo) + ';font-size:13px;padding:5px 10px;cursor:pointer" data-ana="' + a.col + '">+ ' + esc(a.nom.length > 26 ? a.nom.slice(0, 24) + '…' : a.nom) + ' · ' + restes[a.col] + '</button>'; }).join('') + '</div>';
+  } else {
+    var l = classerMatrices();
+    h = '<div class="entre"><span class="sur" style="color:var(--brun)">C\'est quelle matrice ?</span>' + (m ? '<button class="lien" data-mat-fermer="1">fermer</button>' : '') + '</div>' +
+        '<span class="muet" style="font-size:13px">Touchez la matrice du planning qui correspond au produit : les analyses non prévues seront grisées.</span>' +
+        '<div class="puces" style="gap:6px">' + l.map(function (x) { return '<button class="puce' + (FORM.matrice === x.m.n ? ' ok' : '') + '" style="cursor:pointer;font-size:14px" data-mat="' + esc(x.m.n) + '">' + esc(x.m.n) + '</button>'; }).join('') +
+        '<button class="puce" style="cursor:pointer;font-size:14px;border-style:dashed" data-mat="">Aucune / je ne sais pas</button></div>';
+  }
+  z.innerHTML = h;
+}
+document.addEventListener('click', function (ev) {
+  var b = ev.target.closest('[data-mat],[data-mat-changer],[data-mat-fermer]');
+  if (!b || !FORM) return;
+  if (b.hasAttribute('data-mat-changer')) FORM.matOuvert = true;
+  else if (b.hasAttribute('data-mat-fermer')) FORM.matOuvert = false;
+  else { FORM.matrice = b.getAttribute('data-mat'); FORM.matChoix = true; FORM.matAuto = false; FORM.matOuvert = false; }
+  dessinerAnalyses();
+});
+
+/* panels (MYC9) et familles (mycotoxines) de la feuille PANELS ANALYSES */
+function panelsDe(a) {
+  var t = ' ' + norm(a.nom) + ' ';
+  return ((PACK && PACK.panels) || []).filter(function (p) { return (p.mots || []).some(function (m) { return m && t.indexOf(' ' + norm(m)) >= 0; }); });
+}
+/* poids demandé : « 3x1pc et min 250gr », « 2 x 500 ml », « min 1,2 kg », « 3 UVC », « 150gr »… */
+var UNITES = { KG: ['g', 1000], G: ['g', 1], GR: ['g', 1], GRS: ['g', 1], GRAMMES: ['g', 1], MG: ['g', 0.001], L: ['ml', 1000], LITRE: ['ml', 1000], LITRES: ['ml', 1000], LTR: ['ml', 1000], CL: ['ml', 10], DL: ['ml', 100], ML: ['ml', 1] };
+var PIECES = /^(PC|PCS|PCE|PCES|PIECE|PIECES|P|U|UNITE|UNITES|UNIT|UNITS|UVC|STK|STUCK|X)$/;
+function lirePoids(txt) {
+  var r = { n: 0, q: 0, u: '' }, a, b, un;
+  var s = String(txt || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/(\d),(\d)/g, '$1.$2');
+  var m = s.match(/(\d+(?:\.\d+)?)\s*[X×*]\s*(\d+(?:\.\d+)?)?\s*([A-Z]+)?/);
+  if (m) {
+    a = parseFloat(m[1]); b = m[2] ? parseFloat(m[2]) : 1; un = (m[3] || '').replace(/[^A-Z]/g, '');
+    if (UNITES[un]) { r.n = a; r.q = a * b * UNITES[un][1]; r.u = UNITES[un][0]; }
+    else if (!un || PIECES.test(un) || /^(PC|PIECE|UNIT)/.test(un)) r.n = a * b;
+    s = s.replace(m[0], ' ');
+  }
+  if (!r.n) { m = s.match(/(\d+)\s*(PCS?|PCES?|PIECES?|UNITES?|UNITS?|UVC|STUCK|U)\b/); if (m) r.n = parseInt(m[1], 10); }
+  var re = /(\d+(?:\.\d+)?)\s*(KG|GRAMMES|GRS|GR|G|MG|LITRES?|LTR|L|CL|DL|ML)\b/g, x;
+  while ((x = re.exec(s))) { var u = UNITES[x[2]]; if (u) { var q = parseFloat(x[1]) * u[1]; if (!r.u || r.u === u[0]) { if (q > r.q) { r.q = q; r.u = u[0]; } } } }
+  return r;
+}
+/* contenu d'une unité achetée, lu dans la dénomination (« Corn Flakes 375 g », « 6 x 125 g », « 1,5 L ») */
+function contenuUnite(denom) {
+  var s = String(denom || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/(\d),(\d)/g, '$1.$2'), m, re = /(?:(\d+)\s*[X×]\s*)?(\d+(?:\.\d+)?)\s*(KG|GR|G|MG|L|CL|DL|ML)\b/g, last = null;
+  while ((m = re.exec(s))) last = m;
+  if (!last) return null;
+  var u = UNITES[last[3]];
+  return { q: (last[1] ? parseInt(last[1], 10) : 1) * parseFloat(last[2]) * u[1], u: u[0] };
+}
+function besoinAnalyse(a) {
+  var p = lirePoids(a.poids), pans = panelsDe(a), min = 0, noms = [];
+  pans.forEach(function (x) { if (x.min > min) min = x.min; noms.push(x.nom); });
+  return { n: Math.max(p.n || 0, min), q: p.q, u: p.u, panels: noms };
+}
+function texteQ(q, u) { if (!q) return ''; if (u === 'g') return q >= 1000 ? (q / 1000).toString().replace('.', ',') + ' kg' : Math.round(q) + ' g'; return q >= 1000 ? (q / 1000).toString().replace('.', ',') + ' L' : Math.round(q) + ' ml'; }
+function verifQte() {
+  // par laboratoire : un échantillon par analyse cochée ; un même labo partage le produit (MYC9 : 3 pièces pour les 9 mycotoxines)
+  var cols = Object.keys(FORM.ana).map(Number), labs = {}, ordre = [], q = parseInt($('pQte').value, 10) || 0;
+  cols.forEach(function (c) {
+    var a = PACK.analyses.filter(function (x) { return x.col === c; })[0]; if (!a) return;
+    var k = norm(a.labo) || '?', b = besoinAnalyse(a), nb = FORM.ana[c] || 1;
+    if (!labs[k]) { labs[k] = { labo: a.labo || 'Labo ?', n: 0, q: 0, u: '', myc: false, ana: [] }; ordre.push(k); }
+    var L = labs[k];
+    L.n = Math.max(L.n, (b.n || 1) * nb);
+    if (b.q && (!L.u || L.u === b.u)) { L.q = Math.max(L.q, b.q * nb); L.u = b.u; }
+    if (b.panels.length) L.myc = true;
+    L.ana.push(a.nom + (b.panels.length ? ' (' + b.panels.join(', ') + ')' : ''));
+  });
+  var nTot = 0, qTot = 0, uTot = '';
+  ordre.forEach(function (k) { nTot += labs[k].n; if (labs[k].q && (!uTot || uTot === labs[k].u)) { qTot += labs[k].q; uTot = labs[k].u; } });
+  var c = contenuUnite(FORM.denom || $('pDenom').value), achete = c && (!uTot || c.u === uTot) ? c.q * q : 0;
+  var lignes = [], court = false;
+  if (cols.length && q < nTot) {
+    court = true;
+    ordre.forEach(function (k) { var L = labs[k]; lignes.push((L.myc ? '<b>Mycotoxines</b> · ' : '') + esc(L.labo) + ' : ' + L.n + ' pièce(s) minimum'); });
+    lignes.push('Total demandé : <b>' + nTot + ' pièce(s)</b> · vous en avez <b>' + q + '</b>.');
+  }
+  if (cols.length && qTot && achete && achete < qTot) { court = true; lignes.push('Quantité : environ <b>' + texteQ(achete, uTot) + '</b> achetés pour <b>' + texteQ(qTot, uTot) + '</b> demandés.'); }
+  return { court: court, lignes: lignes, nTot: nTot, qTot: qTot, uTot: uTot, achete: achete, q: q, sig: q + '|' + cols.sort().map(function (k) { return k + ':' + FORM.ana[k]; }).join(','),
+           resume: court ? (nTot > q ? nTot + ' pièce(s) demandées, ' + q + ' prise(s)' : '') + (qTot && achete && achete < qTot ? (nTot > q ? ' ; ' : '') + texteQ(achete, uTot) + ' pour ' + texteQ(qTot, uTot) : '') : '' };
+}
+
+/* ======================= récap du magasin : contrôler le caddie ======================= */
+var CADDIE = {};
+function problemesProduit(p) {
+  var l = [];
+  if (p.alerteQte) l.push('quantité sous le minimum');
+  if (!p.photos || !p.photos.length) l.push('pas de photo');
+  if (!p.ce) l.push('contre-échantillon vide');
+  if (p.force && p.force.length) l.push('analyse forcée');
+  if (p.statut === 'completer') l.push('à compléter au bureau');
+  return l;
+}
+function dessinerRecapMag() {
+  if (!PACK) { aller('accueil'); return; }
+  if (!MAG) { aller('magasins'); return; }
+  $('t-recap').textContent = MAG;
+  var ici = produitsDuPack().filter(function (p) { return norm(p.magasin) === norm(MAG); }).sort(function (x, y) { return x.t - y.t; });
+  var unites = 0, ech = 0, coches = 0;
+  ici.forEach(function (p) { unites += p.qte || 0; Object.keys(p.ana || {}).forEach(function (k) { ech += p.ana[k]; }); if (CADDIE[p.id]) coches++; });
+  $('recChiffres').innerHTML = '<div class="mini"><b style="font-size:26px">' + ici.length + '</b><span class="muet">produits</span></div><div class="mini" style="background:var(--ambre-l)"><b style="font-size:26px;color:var(--brun)">' + unites + '</b><span style="color:var(--brun);font-size:14px">pièces à payer</span></div><div class="mini' + (ici.length && coches === ici.length ? ' fini' : '') + '"><b style="font-size:26px">' + coches + ' / ' + ici.length + '</b><span class="muet">dans le caddie</span></div>';
+  var aCorriger = ici.filter(function (p) { return problemesProduit(p).length; });
+  $('recProblemes').innerHTML = aCorriger.length ? '<span class="sur" style="color:var(--brun)">À vérifier avant la caisse</span>' + aCorriger.map(function (p) {
+    return '<button class="ligne-prod completer" data-edit="' + p.id + '"><span class="entre"><b>' + esc(p.denom || 'Produit sans nom') + '</b><span class="muet">× ' + (p.qte || 0) + '</span></span><span class="puces" style="gap:6px">' + problemesProduit(p).map(function (x) { return '<span class="pastille p-ambre">' + esc(x) + '</span>'; }).join('') + '</span></button>';
+  }).join('') : (ici.length ? '<div class="alerte" style="background:var(--vert-l);border-color:var(--vert)"><b style="color:var(--vert-t)">Tout est en ordre pour ce magasin ✓</b></div>' : '');
+  $('recListe').innerHTML = ici.length ? ici.map(function (p) {
+    var on = !!CADDIE[p.id];
+    return '<div class="item caddie' + (on ? ' on' : '') + '"><button class="case-caddie" data-caddie="' + p.id + '" aria-pressed="' + on + '" aria-label="Dans le caddie">' + (on ? '✓' : '') + '</button><button class="caddie-txt" data-edit="' + p.id + '"><b>' + esc(p.denom || 'Produit sans nom') + '</b><span class="muet">' + esc(p.marque || '') + (p.matrice ? ' · ' + esc(p.matrice) : '') + '</span><span class="puces" style="gap:6px;margin-top:4px">' + etiquettes(p.ana) + '</span></button><b class="qte-caddie">× ' + (p.qte || 0) + '</b></div>';
+  }).join('') : '<div class="vide">Aucun produit pris dans ce magasin pour l\'instant.</div>';
+  var b = bilan();
+  $('recReste').innerHTML = b.reste.length ? b.reste.map(function (x) { return '<span class="puce lab" style="--c:' + couleurLabo(x.a.labo) + '">' + esc(x.a.nom.length > 30 ? x.a.nom.slice(0, 28) + '…' : x.a.nom) + ' · ' + x.r + '</span>'; }).join('') : '<span class="puce ok">Toutes les analyses sont complètes ✓</span>';
+}
+document.addEventListener('click', function (ev) {
+  var b = ev.target.closest('[data-caddie]');
+  if (!b) return;
+  var id = b.getAttribute('data-caddie');
+  if (CADDIE[id]) delete CADDIE[id]; else CADDIE[id] = Date.now();
+  kvEcrire('caddie', CADDIE); if (navigator.vibrate) navigator.vibrate(20);
+  dessinerRecapMag();
+});
+
 /* ======================= retour vers Excel ======================= */
 function dessinerRetour() {
   var l = produitsDuPack(true), ph = 0, ac = 0, nouv = 0;
@@ -1103,11 +1440,12 @@ function dessinerRetour() {
 }
 $('nomAppareil').addEventListener('change', function () { kvEcrire('appareil', this.value.trim()); });
 $('btnRetourMag').addEventListener('click', function () { if (MAG) aller('magasin'); });
+$('btnCaddieVider').addEventListener('click', function () { CADDIE = {}; kvEcrire('caddie', CADDIE); dessinerRecapMag(); });
 function ligneProduit(p, avecHeure) {
   var ok = modifiable(p), sEch = 0; Object.keys(p.ana || {}).forEach(function (k) { sEch += p.ana[k]; });
   var h = new Date(p.t), hh = ('0' + h.getHours()).slice(-2) + ':' + ('0' + h.getMinutes()).slice(-2);
   return '<button class="ligne-prod' + (p.statut === 'completer' ? ' completer' : '') + '"' + (ok ? ' data-edit="' + p.id + '"' : ' style="cursor:default"') + '><span class="entre"><span class="rangee" style="gap:8px;min-width:0">' + (avecHeure ? '<span class="heure">' + hh + '</span>' : '') + '<b style="overflow:hidden;text-overflow:ellipsis">' + esc(p.denom || 'Produit sans nom') + '</b></span><span class="muet" style="white-space:nowrap">× ' + (p.qte || 0) + '</span></span>' +
-    '<span class="puces" style="gap:6px">' + (ok ? etiquettes(p.ana) : '<span class="pastille p-gris">' + sEch + ' échantillon(s) · ' + esc(String(p.feuille || '').split(' - ')[0]) + '</span>') + (p.statut === 'completer' ? '<span class="pastille p-ambre">à compléter au bureau</span>' : '') + (p.exporte ? '<span class="pastille p-vert">envoyé</span>' : '') + (!p.qte ? '<span class="pastille p-ambre">qté 0</span>' : '') + '<span class="muet" style="font-size:12px">' + esc(p.marque) + (p.photos.length ? ' · ' + p.photos.length + ' photo(s)' : '') + '</span></span></button>';
+    '<span class="puces" style="gap:6px">' + (ok ? etiquettes(p.ana) : '<span class="pastille p-gris">' + sEch + ' échantillon(s) · ' + esc(String(p.feuille || '').split(' - ')[0]) + '</span>') + (p.statut === 'completer' ? '<span class="pastille p-ambre">à compléter au bureau</span>' : '') + (p.exporte ? '<span class="pastille p-vert">envoyé</span>' : '') + (!p.qte ? '<span class="pastille p-ambre">qté 0</span>' : '') + (p.alerteQte ? '<span class="pastille p-ambre">qté &lt; minimum</span>' : '') + (p.force && p.force.length ? '<span class="pastille p-ambre">analyse forcée</span>' : '') + '<span class="muet" style="font-size:12px">' + esc(p.marque) + (p.photos.length ? ' · ' + p.photos.length + ' photo(s)' : '') + '</span></span></button>';
 }
 function grouperParMagasin(l) {
   var g = [], ix = {};
@@ -1154,11 +1492,12 @@ function ligneTsv(p) {
   var lst = analysesDe(p.feuille);
   var ana = lst.filter(function (a) { return p.ana[a.col] > 0; }).map(function (a) { return a.col + '|' + propre(a.nom).replace(/[|;]/g, ' ') + '|' + p.ana[a.col]; }).join(';');
   var rep = lst.filter(function (a) { return p.reprise.indexOf(a.col) >= 0; }).map(function (a) { return propre(a.nom); }).join(', ');
-  return [p.id, p.feuille, p.magasin, p.marque, p.denom, p.fx, p.ean, p.qte, p.stock, ana, (p.noms || []).join('|'), p.statut, rep, p.note, new Date(p.t).toISOString(), p.ce || ''].map(propre).join('\t');
+  var forc = lst.filter(function (a) { return (p.force || []).indexOf(a.col) >= 0; }).map(function (a) { return propre(a.nom); }).join(', ');
+  return [p.id, p.feuille, p.magasin, p.marque, p.denom, p.fx, p.ean, p.qte, p.stock, ana, (p.noms || []).join('|'), p.statut, rep, p.note, new Date(p.t).toISOString(), p.ce || '', p.matrice || '', forc, p.alerteQte || ''].map(propre).join('\t');
 }
 function faireTsv(l, appareil) {
   var t = ['#BACTERIO-RETOUR\t1\t' + propre(PACK.feuille) + '\t' + PACK.id + '\t' + propre(appareil) + '\t' + new Date().toISOString(),
-    'id\tfeuille\tmagasin\tmarque\tdenomination\tfoodex\tean\tqte\tstock\tanalyses\tphotos\tstatut\treprise\tnote\tdate\tce'];
+    'id\tfeuille\tmagasin\tmarque\tdenomination\tfoodex\tean\tqte\tstock\tanalyses\tphotos\tstatut\treprise\tnote\tdate\tce\tmatrice\tforce\talerte'];
   l.forEach(function (p) { t.push(ligneTsv(p)); });
   return t.join('\r\n') + '\r\n';
 }
@@ -1265,9 +1604,10 @@ function navCote() {
 window.addEventListener('resize', navCote);
 
 appliquerTheme(themeActuel());
-ouvrirBase().then(function () { return Promise.all([kvLire('pack'), tousProduits(), kvLire('magasin'), kvLire('planning'), kvLire('positions'), kvLire('gps'), kvLire('brouillon')]); }).then(function (r) {
+ouvrirBase().then(function () { return Promise.all([kvLire('pack'), tousProduits(), kvLire('magasin'), kvLire('planning'), kvLire('positions'), kvLire('gps'), kvLire('brouillon'), kvLire('caddie')]); }).then(function (r) {
   if (r[0] && r[0].analyses && r[0].analyses.length) installerPack(r[0], +r[3] || 0);
-  PRODUITS = r[1] || []; MAG = r[2] || ''; POS = r[4] || {}; GPS_OK = !!r[5];
+  PRODUITS = r[1] || []; MAG = r[2] || ''; POS = r[4] || {}; GPS_OK = !!r[5]; CADDIE = r[7] || {};
+  if (PACK) setTimeout(chargerFx, 1500);
   navCote(); etatReseau(); try { history.replaceState({ e: 'accueil' }, ''); } catch (x) {} aller('accueil', true);
   var b = r[6];
   if (b && b.form && PACK && b.form.pack === PACK.id) {
