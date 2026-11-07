@@ -299,7 +299,7 @@ nav.onglets svg{width:24px;height:24px}
 
 <script>
 'use strict';
-var APP_VERSION = '1.6.1';
+var APP_VERSION = '1.6.2';
 /* ======================= stockage (IndexedDB) ======================= */
 var DB = null;
 function ouvrirBase() {
@@ -924,7 +924,7 @@ function teinteCE() {
 }
 document.addEventListener('click', function (ev) {
   var b = ev.target.closest('[data-ce]'); if (!b) return;
-  var v = b.getAttribute('data-ce'); $('pCE').value = ($('pCE').value.trim() === v) ? '' : v; teinteCE();
+  var v = b.getAttribute('data-ce'); $('pCE').value = ($('pCE').value.trim() === v) ? '' : v; teinteCE(); suggererCE();
 });
 $('pCE').addEventListener('input', function () { teinteCE(); suggererCE(); });
 $('pMarque').addEventListener('input', function () { FORM.marque = this.value; majDenoms(); dessinerAnalyses(); });
