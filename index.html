@@ -937,7 +937,7 @@ $('pDenom').addEventListener('change', function () {
 /* ======================= aide à la saisie (1.6) ======================= */
 /* suggestions sous Marque, Dénomination et N° de sachet : un appui remplit la case, le curseur reste au bout
    pour corriger ; l'application apprend ce que le préleveur enregistre (même après l'envoi vers Excel) */
-var APPRIS = { m: {}, d: {}, ce: '' }, INDEX_SAISIE = null;
+var APPRIS = { m: {}, d: {}, ces: [] }, INDEX_SAISIE = null;
 function indexSaisie() {
   if (INDEX_SAISIE) return INDEX_SAISIE;
   var M = {}, D = {};
@@ -1009,16 +1009,41 @@ function suggerer(quoi, apresMarque) {
   }
   boite.innerHTML = h;
 }
-/* n° de sachet suivant : dernier numéro enregistré + 1, zéros et préfixe gardés (« S-0457 » -> « S-0458 ») */
-function ceSuivant() {
-  var d = APPRIS.ce || ''; var m = /^(.*?)(\d+)(\D*)$/.exec(d); if (!m) return '';
-  var n = String(parseInt(m[2], 10) + 1); while (n.length < m[2].length) n = '0' + n;
-  return m[1] + n + m[3];
+/* n° de sachet : les sachets se suivent souvent (10322712, 10322713…) mais pas toujours, et plusieurs séries existent
+   (103…, 104…, 0…). On propose le suivant de chaque série récente ; en tapant, seulement ceux qui commencent pareil.
+   Calcul sur le texte (pas de nombre) : les zéros du début et les longs numéros restent exacts. */
+function plusUn(d) {
+  var c = d.split(''), i = c.length - 1;
+  while (i >= 0) { if (c[i] === '9') { c[i] = '0'; i--; } else { c[i] = String(+c[i] + 1); return c.join(''); } }
+  return '1' + c.join('');
+}
+function serieCE(v) { return v.length >= 6 ? v.slice(0, 4) : 'court'; }
+function cesUtilises() {
+  var u = {};
+  (APPRIS.ces || []).forEach(function (x) { u[x.v] = 1; });
+  PRODUITS.forEach(function (p) { if (p.ce) u[String(p.ce).trim()] = 1; });
+  return u;
+}
+function propositionsCE(tape) {
+  var vus = {}, out = [], u = cesUtilises();
+  var l = (APPRIS.ces || []).slice().sort(function (a, b) { return b.t - a.t; });
+  l.forEach(function (x) {
+    var se = serieCE(x.v); if (vus[se]) return; vus[se] = 1;
+    var n = plusUn(x.v), garde = 0;
+    while (u[n] && garde++ < 50) n = plusUn(n);   // déjà pris sur ce téléphone : on passe au suivant
+    out.push({ v: n, serie: se });
+  });
+  if (tape) out = out.filter(function (x) { return x.v.indexOf(tape) === 0 && x.v !== tape; });
+  return out.slice(0, 3);
 }
 function suggererCE() {
   var b = $('sgCE'); if (!b) return;
-  var v = $('pCE').value.trim(), s = ceSuivant();
-  b.innerHTML = !v && s ? '<button type="button" class="sg" data-sg="ce" data-v="' + esc(s) + '"><small>Sachet suivant</small> ' + esc(s) + '</button>' : '';
+  var v = $('pCE').value.trim();
+  if (v && !/^\d+$/.test(v)) { b.innerHTML = ''; return; }
+  var l = propositionsCE(v);
+  b.innerHTML = l.map(function (x, i) {
+    return '<button type="button" class="sg" data-sg="ce" data-v="' + esc(x.v) + '"><small>' + (i ? 'Autre série' : 'Suivant ?') + '</small> ' + esc(x.v) + '</button>';
+  }).join('');
 }
 function accepterSuggestion(btn) {
   var t = btn.getAttribute('data-sg'), v = btn.getAttribute('data-v');
@@ -1091,7 +1116,11 @@ function apprendreSaisie(p) {
   var t = Date.now(), km = norm(p.marque), kd = norm(p.denom);
   if (km) { var a = APPRIS.m[km] || (APPRIS.m[km] = { v: p.marque, n: 0, t: 0 }); a.v = p.marque; a.n++; a.t = t; }
   if (kd) { var c = km + '|' + kd, d = APPRIS.d[c] || (APPRIS.d[c] = { v: p.denom, m: p.marque, fx: p.fx || '', n: 0, t: 0 }); d.v = p.denom; d.m = p.marque; if (p.fx) d.fx = p.fx; d.n++; d.t = t; }
-  if (/\d/.test(p.ce || '')) APPRIS.ce = p.ce;
+  var ce = String(p.ce || '').trim();
+  if (/^\d+$/.test(ce)) {
+    APPRIS.ces = (APPRIS.ces || []).filter(function (x) { return x.v !== ce; });
+    APPRIS.ces.push({ v: ce, t: t }); if (APPRIS.ces.length > 40) APPRIS.ces = APPRIS.ces.slice(-40);
+  }
   // on garde les 1500 dénominations les plus récentes
   var ks = Object.keys(APPRIS.d); if (ks.length > 1500) ks.sort(function (x, y) { return APPRIS.d[x].t - APPRIS.d[y].t; }).slice(0, ks.length - 1500).forEach(function (k) { delete APPRIS.d[k]; });
   INDEX_SAISIE = null; kvEcrire('appris', APPRIS);
@@ -1779,7 +1808,7 @@ window.addEventListener('resize', navCote);
 appliquerTheme(themeActuel());
 ouvrirBase().then(function () { return Promise.all([kvLire('pack'), tousProduits(), kvLire('magasin'), kvLire('planning'), kvLire('positions'), kvLire('gps'), kvLire('brouillon'), kvLire('caddie'), kvLire('appris')]); }).then(function (r) {
   if (r[0] && r[0].analyses && r[0].analyses.length) installerPack(r[0], +r[3] || 0);
-  PRODUITS = r[1] || []; MAG = r[2] || ''; POS = r[4] || {}; GPS_OK = !!r[5]; CADDIE = r[7] || {}; APPRIS = r[8] || { m: {}, d: {}, ce: '' }; APPRIS.m = APPRIS.m || {}; APPRIS.d = APPRIS.d || {};
+  PRODUITS = r[1] || []; MAG = r[2] || ''; POS = r[4] || {}; GPS_OK = !!r[5]; CADDIE = r[7] || {}; APPRIS = r[8] || { m: {}, d: {}, ces: [] }; APPRIS.m = APPRIS.m || {}; APPRIS.d = APPRIS.d || {}; APPRIS.ces = APPRIS.ces || [];
   if (PACK) setTimeout(chargerFx, 1500);
   navCote(); etatReseau(); try { history.replaceState({ e: 'accueil' }, ''); } catch (x) {} aller('accueil', true);
   var b = r[6];
