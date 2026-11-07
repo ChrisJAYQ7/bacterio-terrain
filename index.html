@@ -107,6 +107,14 @@ nav.onglets svg{width:24px;height:24px}
 .groupe{display:flex;flex-direction:column;gap:8px}
 .groupe>h3{font-size:15px;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
 .heure{font-variant-numeric:tabular-nums;font-weight:800;color:var(--violet-t);font-size:13px;min-width:44px}
+.champ{display:flex;flex-direction:column;gap:6px}
+.bio{flex:none;min-width:64px;min-height:50px;border-radius:14px;border:2px solid var(--vert);background:transparent;color:var(--vert-t);font:inherit;font-size:15px;font-weight:900;letter-spacing:.06em;cursor:pointer}
+.bio[aria-pressed="true"]{background:var(--vert);color:#fff}
+.bio[aria-pressed="true"]::before{content:"✓ "}
+.sugg{display:flex;flex-wrap:wrap;gap:8px;margin-top:-4px}.sugg:empty{display:none}
+.sg{min-height:44px;max-width:100%;padding:0 14px;border-radius:22px;border:1.5px solid var(--violet);background:var(--violet-l);color:var(--ink);font:inherit;font-size:15px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;text-align:left;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.sg>span{overflow:hidden;text-overflow:ellipsis}.sg b{color:var(--violet-t);font-weight:800}.sg small{font-size:12px;font-weight:700;color:var(--mute)}
+.sg.sg-un{border-width:2px}
 .ana.gris{opacity:.5;border-left-color:var(--champ-bord)}
 .ana.gris .case{border-style:dashed}
 .ana .forcer{min-height:36px;padding:0 12px;border-radius:10px;border:1.5px solid var(--brun);background:transparent;color:var(--brun);font:inherit;font-size:13px;font-weight:800;cursor:pointer;opacity:1}
@@ -209,9 +217,11 @@ nav.onglets svg{width:24px;height:24px}
     <section class="ecran" id="e-produit" aria-labelledby="t-produit">
       <div class="rangee"><button class="btn btn-contour" style="min-height:44px;width:44px;padding:0" id="btnProdRetour" aria-label="Retour">‹</button><div><div class="muet" id="prodMag"></div><h1 class="titre" id="t-produit" style="font-size:22px">Produit</h1></div></div>
       <div class="carte" id="prodFiche"></div>
-      <label class="champ" for="pMarque">Marque<input type="text" id="pMarque" list="dlMarques" autocomplete="off"></label>
-      <label class="champ" for="pDenom">Dénomination (avec poids ou volume)<input type="text" id="pDenom" list="dlDenoms" autocomplete="off"></label>
-      <datalist id="dlMarques"></datalist><datalist id="dlDenoms"></datalist>
+      <label class="champ" for="pMarque">Marque<input type="text" id="pMarque" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="next"></label>
+      <div class="sugg" id="sgMarque" aria-label="Suggestions de marque"></div>
+      <div class="champ"><label for="pDenom" style="font-size:13px;font-weight:700;color:var(--mute)">Dénomination (avec poids ou volume)</label>
+        <div class="rangee" style="gap:8px;align-items:stretch"><button type="button" class="bio" id="btnBio" aria-pressed="false" title="Produit bio : ajoute BIO devant la dénomination">BIO</button><input type="text" id="pDenom" autocomplete="off" spellcheck="false" enterkeyhint="done" style="flex:1;min-width:0"></div></div>
+      <div class="sugg" id="sgDenom" aria-label="Suggestions de dénomination"></div>
       <div class="carte" id="prodMatrice" style="display:none;flex-direction:column;gap:6px"></div>
       <div id="prodAlertes" style="display:flex;flex-direction:column;gap:10px"></div>
       <div class="sur" style="color:var(--mute)">Analyses pour ce produit</div>
@@ -227,6 +237,7 @@ nav.onglets svg{width:24px;height:24px}
         <button class="btn btn-contour" type="button" data-ce="N/A" style="min-height:48px">N/A</button>
         <button class="btn btn-contour" type="button" data-ce="Qté insuff." style="min-height:48px">Qté insuff.</button>
       </div>
+      <div class="sugg" id="sgCE" aria-label="Numéro de sachet suivant"></div>
       <div class="photos" id="prodPhotos"></div>
       <label class="btn btn-pointille large" for="fichierPhoto">Photos (face, étiquette, DLC et lot)</label>
       <input type="file" id="fichierPhoto" accept="image/*" capture="environment" multiple class="sr">
@@ -288,7 +299,7 @@ nav.onglets svg{width:24px;height:24px}
 
 <script>
 'use strict';
-var APP_VERSION = '1.5.0';
+var APP_VERSION = '1.6.0';
 /* ======================= stockage (IndexedDB) ======================= */
 var DB = null;
 function ouvrirBase() {
@@ -475,6 +486,7 @@ document.addEventListener('click', function (ev) {
 /* fiche non enregistrée : on demande avant de la quitter */
 function lireFiche() {
   if (!FORM) return;
+  if (document.activeElement !== $('pDenom')) corrigerBio($('pDenom'), true);
   FORM.marque = $('pMarque').value.trim(); FORM.denom = $('pDenom').value.trim();
   FORM.qte = parseInt($('pQte').value, 10) || 0; FORM.stock = $('pStock').value.trim(); FORM.ce = $('pCE').value.trim();
   FORM.statut = $('pCompleter').checked ? 'completer' : 'ok';
@@ -590,7 +602,7 @@ function installerPack(p, choix) {
   var vus = {};
   (p.produits || []).forEach(function (x) { var k = norm(x[0]); if (k && !vus[k]) { vus[k] = 1; MARQUES.push(x[0]); } });
   MARQUES.sort(function (a, b) { return a.localeCompare(b, 'fr'); });
-  $('dlMarques').innerHTML = MARQUES.slice(0, 3000).map(function (m) { return '<option value="' + esc(m) + '">'; }).join('');
+  INDEX_SAISIE = null;
 }
 
 /* ======================= magasins ======================= */
@@ -889,7 +901,7 @@ function ouvrirProduit(existant, code, brouillon) {
   FORM.force = FORM.force || []; FORM.matOuvert = false; chargerFx();
   $('prodMag').textContent = FORM.magasin + ' · ' + PACK.feuille.split(' - ')[0];
   $('t-produit').textContent = existant ? 'Modifier le produit' : (FORM.trouve ? 'Produit reconnu' : (FORM.ean ? 'Code inconnu' : 'Produit sans code-barres'));
-  $('pMarque').value = FORM.marque; $('pDenom').value = FORM.denom;
+  $('pMarque').value = FORM.marque; $('pDenom').value = FORM.denom; corrigerBio($('pDenom'), true); FORM.denom = $('pDenom').value;
   $('pQte').value = FORM.qte || ''; $('pStock').value = FORM.stock || ''; $('pCE').value = FORM.ce || ''; teinteCE();
   $('lblStock').style.display = PACK.stock ? 'flex' : 'none';
   $('pCompleter').checked = FORM.statut === 'completer';
@@ -905,11 +917,7 @@ function dessinerFiche() {
   else h = '<span class="pastille p-gris">Sans code-barres</span><div class="muet" style="margin-top:8px">Marque, dénomination et photos suffisent.</div>';
   $('prodFiche').innerHTML = h;
 }
-function majDenoms() {
-  var m = norm($('pMarque').value), l = [];
-  (PACK.produits || []).forEach(function (x) { if (!m || norm(x[0]) === m) l.push(x[1]); });
-  $('dlDenoms').innerHTML = l.slice(0, 400).map(function (d) { return '<option value="' + esc(d) + '">'; }).join('');
-}
+function majDenoms() { if (surFiche()) { suggerer('marque'); suggerer('denom'); suggererCE(); } }
 function teinteCE() {
   var v = $('pCE').value.trim();
   document.querySelectorAll('[data-ce]').forEach(function (b) { var on = b.getAttribute('data-ce') === v; b.style.background = on ? 'var(--ink)' : ''; b.style.color = on ? '#F7F5EF' : ''; });
@@ -918,13 +926,176 @@ document.addEventListener('click', function (ev) {
   var b = ev.target.closest('[data-ce]'); if (!b) return;
   var v = b.getAttribute('data-ce'); $('pCE').value = ($('pCE').value.trim() === v) ? '' : v; teinteCE();
 });
-$('pCE').addEventListener('input', teinteCE);
+$('pCE').addEventListener('input', function () { teinteCE(); suggererCE(); });
 $('pMarque').addEventListener('input', function () { FORM.marque = this.value; majDenoms(); dessinerAnalyses(); });
-$('pDenom').addEventListener('input', function () { FORM.denom = this.value; clearTimeout(this.h); this.h = setTimeout(dessinerAnalyses, 300); });
+$('pDenom').addEventListener('input', function () { corrigerBio(this, false); FORM.denom = this.value; suggerer('denom'); clearTimeout(this.h); this.h = setTimeout(dessinerAnalyses, 300); });
 $('pDenom').addEventListener('change', function () {
   var m = norm($('pMarque').value), d = norm(this.value), x = (PACK.produits || []).filter(function (p) { return norm(p[1]) === d && (!m || norm(p[0]) === m); })[0];
   if (x && x[2] && !FORM.fx) FORM.fx = x[2];
 });
+
+/* ======================= aide à la saisie (1.6) ======================= */
+/* suggestions sous Marque, Dénomination et N° de sachet : un appui remplit la case, le curseur reste au bout
+   pour corriger ; l'application apprend ce que le préleveur enregistre (même après l'envoi vers Excel) */
+var APPRIS = { m: {}, d: {}, ce: '' }, INDEX_SAISIE = null;
+function indexSaisie() {
+  if (INDEX_SAISIE) return INDEX_SAISIE;
+  var M = {}, D = {};
+  function ajM(nom, poids, t) { nom = String(nom || '').trim(); var k = norm(nom); if (!k) return; var e = M[k] || (M[k] = { v: nom, k: k, n: 0, t: 0 }); e.n += poids; if (t > e.t) { e.t = t; if (poids >= 1) e.v = nom; } }
+  function ajD(mq, de, fx, poids, t) { de = String(de || '').trim(); var k = norm(de); if (!k) return; var km = norm(mq), cle = km + '|' + k; var e = D[cle] || (D[cle] = { v: de, k: k, m: String(mq || '').trim(), km: km, fx: fx || '', n: 0, t: 0 }); e.n += poids; if (fx && !e.fx) e.fx = fx; if (t > e.t) { e.t = t; if (poids >= 1) e.v = de; } }
+  if (PACK) {
+    (PACK.produits || []).forEach(function (x) { ajM(x[0], 0.2, 0); ajD(x[0], x[1], x[2], 0.2, 0); });
+    (PACK.base || []).forEach(function (b) { ajM(b[1], 0.1, 0); ajD(b[1], b[2], b[3], 0.1, 0); });
+  }
+  Object.keys(APPRIS.m).forEach(function (k) { var a = APPRIS.m[k]; ajM(a.v, a.n, a.t); });
+  Object.keys(APPRIS.d).forEach(function (k) { var a = APPRIS.d[k]; ajD(a.m, a.v, a.fx, a.n, a.t); });
+  PRODUITS.forEach(function (p) { if (p.exporte) return; ajM(p.marque, 0, p.t); ajD(p.marque, p.denom, p.fx, 0, p.t); });
+  INDEX_SAISIE = { m: Object.keys(M).map(function (k) { return M[k]; }), d: Object.keys(D).map(function (k) { return D[k]; }) };
+  return INDEX_SAISIE;
+}
+/* correspondance : chaque mot tapé doit commencer un mot de la proposition (« corn fl » -> « Corn Flakes ») */
+function scoreSaisie(q, k) {
+  if (!q) return 0.1;
+  if (k === q) return 3.5;
+  if (k.indexOf(q) === 0) return 3;
+  var mots = k.split(' '), tq = q.split(' '), ok = tq.every(function (w) { return mots.some(function (m) { return m.indexOf(w) === 0; }); });
+  if (ok) return 2;
+  if (q.length >= 3 && k.replace(/ /g, '').indexOf(q.replace(/ /g, '')) >= 0) return 1;
+  return -1;
+}
+function classer(l, q, bonus) {
+  var now = Date.now();
+  return l.map(function (e) {
+    var s = scoreSaisie(q, e.k); if (s < 0) return null;
+    if (s === 0.1 && e.n < 1) return null;   // champ vide : seulement ce qui a déjà servi
+    var r = s + Math.log(1 + e.n) * 0.6 + (e.t && now - e.t < 864e5 * 14 ? 0.4 : 0) + (bonus ? bonus(e) : 0);
+    return { e: e, r: r };
+  }).filter(Boolean).sort(function (a, b) { return b.r - a.r || a.e.v.length - b.e.v.length; });
+}
+function surligner(v, q) {
+  if (!q) return esc(v);
+  var tq = q.split(' ').filter(Boolean), out = '', mots = v.split(/(\s+)/);
+  mots.forEach(function (m) {
+    var nm = norm(m), w = tq.filter(function (t) { return nm.indexOf(t) === 0; })[0];
+    if (w && /^[\wÀ-ÿ'’-]+$/.test(m) && m.length >= w.length) out += '<b>' + esc(m.slice(0, w.length)) + '</b>' + esc(m.slice(w.length)); else out += esc(m);
+  });
+  return out;
+}
+function suggerer(quoi, apresMarque) {
+  if (!FORM || !PACK) return;
+  var I = indexSaisie(), boite = $(quoi === 'marque' ? 'sgMarque' : 'sgDenom'), champ = $(quoi === 'marque' ? 'pMarque' : 'pDenom');
+  var q = norm(champ.value), h = '', l;
+  if (quoi === 'denom') q = sansBio(q);
+  var actif = document.activeElement === champ;
+  if (quoi === 'marque') {
+    if (!actif && !q) { boite.innerHTML = ''; return; }
+    l = classer(I.m, q).filter(function (x) { return x.e.v !== champ.value.trim(); }).slice(0, 4);
+    h = l.map(function (x) { return '<button type="button" class="sg" data-sg="marque" data-v="' + esc(x.e.v) + '"><span>' + surligner(x.e.v, q) + '</span></button>'; }).join('');
+  } else {
+    var km = norm($('pMarque').value);
+    if (!actif && (q || !km)) { boite.innerHTML = ''; return; }
+    var memes = km ? I.d.filter(function (e) { return e.km === km; }) : [];
+    var base = km && memes.length ? memes : I.d;
+    if (!q && !km) { boite.innerHTML = ''; return; }
+    // champ dénomination pas encore touché : propositions seulement pour une marque connue, une fois la marque finie
+    if (!actif && (!memes.length || (document.activeElement === $('pMarque') && !apresMarque))) { boite.innerHTML = ''; return; }
+    l = classer(base, q, function (e) { return km && e.km === km ? 0.5 : 0; });
+    if (!q) l = base.map(function (e) { return { e: e, r: Math.log(1 + e.n) + (e.t ? e.t / 1e13 : 0) }; }).sort(function (a, b) { return b.r - a.r; });
+    var vus = {}, cur = champ.value.trim(); l = l.filter(function (x) { if (vus[x.e.k] || x.e.v === cur) return false; vus[x.e.k] = 1; return true; }).slice(0, 4);
+    h = l.map(function (x) {
+      var autre = x.e.m && norm(x.e.m) !== km ? ' <small>' + esc(x.e.m) + '</small>' : '';
+      return '<button type="button" class="sg" data-sg="denom" data-v="' + esc(x.e.v) + '" data-m="' + esc(x.e.m) + '" data-fx="' + esc(x.e.fx) + '"><span>' + surligner(x.e.v, q) + '</span>' + autre + '</button>';
+    }).join('');
+  }
+  boite.innerHTML = h;
+}
+/* n° de sachet suivant : dernier numéro enregistré + 1, zéros et préfixe gardés (« S-0457 » -> « S-0458 ») */
+function ceSuivant() {
+  var d = APPRIS.ce || ''; var m = /^(.*?)(\d+)(\D*)$/.exec(d); if (!m) return '';
+  var n = String(parseInt(m[2], 10) + 1); while (n.length < m[2].length) n = '0' + n;
+  return m[1] + n + m[3];
+}
+function suggererCE() {
+  var b = $('sgCE'); if (!b) return;
+  var v = $('pCE').value.trim(), s = ceSuivant();
+  b.innerHTML = !v && s ? '<button type="button" class="sg" data-sg="ce" data-v="' + esc(s) + '"><small>Sachet suivant</small> ' + esc(s) + '</button>' : '';
+}
+function accepterSuggestion(btn) {
+  var t = btn.getAttribute('data-sg'), v = btn.getAttribute('data-v');
+  var champ = $(t === 'marque' ? 'pMarque' : t === 'denom' ? 'pDenom' : 'pCE');
+  if (t === 'denom') v = avecBio(v, estBio($('pDenom').value));
+  champ.value = v;
+  if (t === 'denom') {
+    var m = btn.getAttribute('data-m'), fx = btn.getAttribute('data-fx');
+    if (m && !$('pMarque').value.trim()) { $('pMarque').value = m; FORM.marque = m; }
+    if (fx && !FORM.fx) FORM.fx = fx;
+  }
+  champ.dispatchEvent(new Event('input', { bubbles: true }));
+  if (t === 'ce') champ.blur();
+  else {
+    champ.focus();
+    try { champ.setSelectionRange(v.length, v.length); } catch (e) {}
+    $(t === 'marque' ? 'sgMarque' : 'sgDenom').innerHTML = '';
+    if (t === 'marque') suggerer('denom', true);
+  }
+  if (navigator.vibrate) navigator.vibrate(12);
+}
+/* appui sur une suggestion : on garde le clavier ouvert (pas de perte de focus) */
+document.addEventListener('pointerdown', function (ev) { if (ev.target.closest('[data-sg]')) ev.preventDefault(); });
+document.addEventListener('mousedown', function (ev) { if (ev.target.closest('[data-sg]')) ev.preventDefault(); });
+document.addEventListener('click', function (ev) { var b = ev.target.closest('[data-sg]'); if (b) accepterSuggestion(b); });
+['pMarque', 'pDenom'].forEach(function (id) {
+  $(id).addEventListener('focus', function () { suggerer(id === 'pMarque' ? 'marque' : 'denom'); });
+  $(id).addEventListener('blur', function () { if (id === 'pDenom') { corrigerBio(this, true); FORM && (FORM.denom = this.value); } var q = id; setTimeout(function () { if (document.activeElement !== $(q)) suggerer(q === 'pMarque' ? 'marque' : 'denom'); }, 150); });
+  $(id).addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Enter') return;
+    ev.preventDefault();
+    if (id === 'pMarque') $('pDenom').focus(); else this.blur();
+  });
+});
+/* bouton BIO devant la dénomination : ajoute « BIO » en majuscules au début, on continue à écrire derrière ;
+   « bio » tapé à la main (Bio, bio…) est remis en majuscules dès qu'il est suivi d'un espace */
+var RX_BIO_FIN = /(^|[^A-Za-zÀ-ÿ0-9])bio(?=$|[^A-Za-zÀ-ÿ0-9])/gi, RX_BIO_SEP = /(^|[^A-Za-zÀ-ÿ0-9])bio(?=[^A-Za-zÀ-ÿ0-9])/gi;
+function estBio(v) { RX_BIO_FIN.lastIndex = 0; return RX_BIO_FIN.test(String(v || '')); }
+function sansBio(q) { return String(q || '').split(' ').filter(function (w) { return w !== 'BIO'; }).join(' '); }
+function avecBio(v, bio) {
+  v = String(v || '').trim();
+  if (!bio) return v;
+  if (estBio(v)) return v.replace(RX_BIO_FIN, function (m, a) { return a + 'BIO'; });
+  return 'BIO ' + v;
+}
+function corrigerBio(champ, fin) {
+  var v = champ.value, rx = fin ? RX_BIO_FIN : RX_BIO_SEP; rx.lastIndex = 0;
+  var n = v.replace(rx, function (m, a) { return a + 'BIO'; });
+  // en sortant du champ, BIO est ramené au début : « Haferflocken bio » -> « BIO Haferflocken »
+  if (fin && estBio(n) && !/^BIO(\s|$)/.test(n)) n = 'BIO ' + n.replace(RX_BIO_FIN, '$1').replace(/\s{2,}/g, ' ').trim();
+  if (n !== v) {
+    var a = champ.selectionStart, z = champ.selectionEnd;
+    champ.value = n;   // même longueur : le curseur ne bouge pas
+    try { if (document.activeElement === champ) champ.setSelectionRange(a, z); } catch (e) {}
+  }
+  majBio();
+}
+function majBio() { $('btnBio').setAttribute('aria-pressed', estBio($('pDenom').value) ? 'true' : 'false'); }
+$('btnBio').addEventListener('pointerdown', function (ev) { ev.preventDefault(); });
+$('btnBio').addEventListener('click', function () {
+  var c = $('pDenom'), v = c.value;
+  if (estBio(v)) v = v.replace(RX_BIO_FIN, '$1').replace(/\s{2,}/g, ' ').replace(/^\s+/, '');
+  else v = 'BIO ' + v.replace(/^\s+/, '');
+  c.value = v; c.focus();
+  try { c.setSelectionRange(v.length, v.length); } catch (e) {}
+  c.dispatchEvent(new Event('input', { bubbles: true }));
+  if (navigator.vibrate) navigator.vibrate(12);
+});
+function apprendreSaisie(p) {
+  var t = Date.now(), km = norm(p.marque), kd = norm(p.denom);
+  if (km) { var a = APPRIS.m[km] || (APPRIS.m[km] = { v: p.marque, n: 0, t: 0 }); a.v = p.marque; a.n++; a.t = t; }
+  if (kd) { var c = km + '|' + kd, d = APPRIS.d[c] || (APPRIS.d[c] = { v: p.denom, m: p.marque, fx: p.fx || '', n: 0, t: 0 }); d.v = p.denom; d.m = p.marque; if (p.fx) d.fx = p.fx; d.n++; d.t = t; }
+  if (/\d/.test(p.ce || '')) APPRIS.ce = p.ce;
+  // on garde les 1500 dénominations les plus récentes
+  var ks = Object.keys(APPRIS.d); if (ks.length > 1500) ks.sort(function (x, y) { return APPRIS.d[x].t - APPRIS.d[y].t; }).slice(0, ks.length - 1500).forEach(function (k) { delete APPRIS.d[k]; });
+  INDEX_SAISIE = null; kvEcrire('appris', APPRIS);
+}
 
 /* historique : même marque et dénomination proche, analyse citée */
 function jetons(s) { return norm(s).split(' ').filter(function (w) { return w.length >= 3 && !/^\d+(G|KG|ML|CL|L)?$/.test(w); }); }
@@ -1082,6 +1253,7 @@ document.addEventListener('click', function (ev) {
 $('btnEnregistrer').addEventListener('click', function () { enregistrer(null); });
 function enregistrer(suite, qteVue) {
   if (!FORM) return;
+  corrigerBio($('pDenom'), true);
   lireFiche();
   var cols = Object.keys(FORM.ana).map(Number);
   if (!cols.length) { toast('Cochez au moins une analyse.'); return; }
@@ -1108,6 +1280,7 @@ function enregistrer(suite, qteVue) {
     if (orig) orig.photos.forEach(function (id) { if (p.photos.indexOf(id) < 0) effacerPhoto(id); });
     var i = PRODUITS.map(function (x) { return x.id; }).indexOf(p.id);
     if (i >= 0) PRODUITS[i] = p; else PRODUITS.push(p);
+    apprendreSaisie(p);
     if (navigator.vibrate) navigator.vibrate([30, 40, 30]);
     var fini = cols.filter(function (c) { var a = PACK.analyses.filter(function (x) { return x.col === c; })[0]; return a && dejaAnalyse(c) === a.total; });
     toast(fini.length ? 'Ajouté ✓ · une analyse vient d\'être complétée !' : (EDIT ? 'Changements enregistrés ✓' : 'Ajouté au planning ✓'));
@@ -1604,9 +1777,9 @@ function navCote() {
 window.addEventListener('resize', navCote);
 
 appliquerTheme(themeActuel());
-ouvrirBase().then(function () { return Promise.all([kvLire('pack'), tousProduits(), kvLire('magasin'), kvLire('planning'), kvLire('positions'), kvLire('gps'), kvLire('brouillon'), kvLire('caddie')]); }).then(function (r) {
+ouvrirBase().then(function () { return Promise.all([kvLire('pack'), tousProduits(), kvLire('magasin'), kvLire('planning'), kvLire('positions'), kvLire('gps'), kvLire('brouillon'), kvLire('caddie'), kvLire('appris')]); }).then(function (r) {
   if (r[0] && r[0].analyses && r[0].analyses.length) installerPack(r[0], +r[3] || 0);
-  PRODUITS = r[1] || []; MAG = r[2] || ''; POS = r[4] || {}; GPS_OK = !!r[5]; CADDIE = r[7] || {};
+  PRODUITS = r[1] || []; MAG = r[2] || ''; POS = r[4] || {}; GPS_OK = !!r[5]; CADDIE = r[7] || {}; APPRIS = r[8] || { m: {}, d: {}, ce: '' }; APPRIS.m = APPRIS.m || {}; APPRIS.d = APPRIS.d || {};
   if (PACK) setTimeout(chargerFx, 1500);
   navCote(); etatReseau(); try { history.replaceState({ e: 'accueil' }, ''); } catch (x) {} aller('accueil', true);
   var b = r[6];
