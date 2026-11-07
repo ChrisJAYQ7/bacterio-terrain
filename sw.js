@@ -1,6 +1,6 @@
 /* BACTERIO terrain : fonctionne hors ligne (les écrans sont gardés sur le téléphone).
    Les données saisies ne passent jamais par ce fichier : elles restent dans le téléphone. */
-var VERSION = 'bacterio-terrain-v1.6.2';
+var VERSION = 'bacterio-terrain-v1.6.3';
 var FICHIERS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './fx.json'];
 
 self.addEventListener('install', function (e) {
