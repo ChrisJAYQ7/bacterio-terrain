@@ -209,7 +209,7 @@ nav.onglets svg{width:24px;height:24px}
       <p class="muet" id="scanEtat">Visez le code-barres dans le cadre.</p>
       <label class="btn btn-contour large" for="photoCode" id="lblPhotoCode">Photographier le code-barres</label>
       <input type="file" id="photoCode" accept="image/*" capture="environment" class="sr">
-      <label class="champ" for="codeManuel">Ou tapez les chiffres du code<input type="tel" id="codeManuel" inputmode="numeric" autocomplete="off" placeholder="ex. 5410000123456"></label>
+      <label class="champ" for="codeManuel">Ou tapez les chiffres du code<input type="tel" id="codeManuel" inputmode="numeric" autocomplete="off" placeholder="ex. 5410000123456 (espaces permis)"></label>
       <button class="btn btn-noir large" id="btnCodeOk">Valider ce code</button>
     </section>
 
@@ -299,7 +299,7 @@ nav.onglets svg{width:24px;height:24px}
 
 <script>
 'use strict';
-var APP_VERSION = '1.6.3';
+var APP_VERSION = '1.7.0';
 /* ======================= stockage (IndexedDB) ======================= */
 var DB = null;
 function ouvrirBase() {
@@ -595,10 +595,16 @@ $('fichierPack').addEventListener('change', function () {
   lr.onerror = function () { toast('Lecture du fichier impossible.'); };
   lr.readAsText(f, 'utf-8');
 });
+/* codes-barres : une seule forme pour comparer (14 chiffres, zéros à gauche), comme le Scanner v21 :
+   « 7 617700 408505 », « 7617700408505 », UPC à 12 chiffres et « 0761… » sont le même code */
+function cleCode(s) { var d = String(s == null ? '' : s).replace(/\D/g, ''); return d.length >= 8 && d.length <= 14 ? ('00000000000000' + d).slice(-14) : ''; }
+function affCode(k) { return !k || k.length !== 14 ? (k || '') : (k.slice(0, 6) === '000000' ? k.slice(-8) : (k.charAt(0) === '0' ? k.slice(-13) : k)); }
+/* code de balance ou d'étiquette de magasin (02…, 04…, EAN-8 en 0 ou 2) : le même code sert à d'autres produits ailleurs */
+function codeMagasin(k) { k = k && k.length === 14 ? k : cleCode(k); return !!k && /^(02|004|0000000|0000002)/.test(k); }
 function installerPack(p, choix) {
   PACK = p; BASE = {}; MARQUES = []; PACK.choix = 0;
   if (p.plannings && p.plannings.length) choisirPlanning(choix >= 0 && choix < p.plannings.length ? choix : 0);
-  (p.base || []).forEach(function (b) { BASE[String(b[0]).replace(/\s/g, '')] = b; });
+  (p.base || []).forEach(function (b) { var k = cleCode(b[0]); if (k) BASE[k] = b; });
   var vus = {};
   (p.produits || []).forEach(function (x) { var k = norm(x[0]); if (k && !vus[k]) { vus[k] = 1; MARQUES.push(x[0]); } });
   MARQUES.sort(function (a, b) { return a.localeCompare(b, 'fr'); });
@@ -878,7 +884,7 @@ function arreterCamera() {
 }
 $('btnCodeOk').addEventListener('click', function () {
   var c = $('codeManuel').value.replace(/\D/g, '');
-  if (c.length < 6) { toast('Tapez au moins 6 chiffres.'); return; }
+  if (c.length < 8) { toast('Tapez les 8 à 14 chiffres du code (les espaces ne comptent pas).'); return; }
   arreterCamera(); ouvrirProduit(null, c);
 });
 $('btnScanRetour').addEventListener('click', function () { aller(RETOUR_SCAN || 'magasin'); });
@@ -893,8 +899,9 @@ function ouvrirProduit(existant, code, brouillon) {
     FORM = JSON.parse(JSON.stringify(existant)); EDIT = existant.id;
   } else {
     EDIT = null;
+    var kc = cleCode(code); if (kc) code = affCode(kc);
     FORM = { id: uid(), pack: PACK.id, feuille: PACK.feuille, magasin: MAG, marque: '', denom: '', fx: '', ean: code || '', qte: 0, stock: '', ana: {}, photos: [], statut: 'ok', reprise: [], note: '', ce: '', t: Date.now(), exporte: false, trouve: false, matrice: '', matChoix: false, force: [], alerteQte: '', qteOk: '' };
-    var b = code ? BASE[code] : null;
+    var b = kc ? BASE[kc] : null;
     if (b) { FORM.marque = b[1] || ''; FORM.denom = b[2] || ''; FORM.fx = b[3] || ''; FORM.trouve = true; if (b[4] && FORM.denom.indexOf(b[4]) < 0 && /\d/.test(b[4])) FORM.denom = (FORM.denom + ' ' + b[4]).trim(); }
     else if (code) FORM.statut = 'completer';
   }
@@ -913,6 +920,7 @@ function ouvrirProduit(existant, code, brouillon) {
 function dessinerFiche() {
   var h;
   if (FORM.trouve) h = '<div class="entre"><span class="pastille p-vert">Reconnu dans la base</span>' + (FORM.fx ? '<span class="pastille" style="background:#F9ECE7;color:#B35C0A">FoodEx2 ' + esc(FORM.fx) + '</span>' : '') + '</div><div class="muet" style="margin-top:8px">Code ' + esc(FORM.ean) + '. Vérifiez la fiche : DLC et lot ne sont jamais repris.</div>';
+  else if (FORM.ean && codeMagasin(FORM.ean)) h = '<span class="pastille p-ambre">Code magasin ' + esc(FORM.ean) + '</span><div class="muet" style="margin-top:8px">Code de balance ou d\'étiquette du magasin : il change d\'un magasin à l\'autre, il ne sert pas à reconnaître le produit. Tapez marque et dénomination, prenez les photos.</div>';
   else if (FORM.ean) h = '<span class="pastille p-ambre">Code ' + esc(FORM.ean) + ' inconnu</span><div class="muet" style="margin-top:8px">Tapez marque et dénomination si possible, prenez les photos : le Scanner complétera au bureau.</div>';
   else h = '<span class="pastille p-gris">Sans code-barres</span><div class="muet" style="margin-top:8px">Marque, dénomination et photos suffisent.</div>';
   $('prodFiche').innerHTML = h;
