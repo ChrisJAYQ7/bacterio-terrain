@@ -299,7 +299,7 @@ nav.onglets svg{width:24px;height:24px}
 
 <script>
 'use strict';
-var APP_VERSION = '1.7.0';
+var APP_VERSION = '1.7.1';
 /* ======================= stockage (IndexedDB) ======================= */
 var DB = null;
 function ouvrirBase() {
@@ -781,8 +781,10 @@ var EAN = (function () {
     }
     return px;
   }
-  function lireLigne(g) {
+  function lireLigne(g, inv) {
+    // inv : barres claires sur fond foncé (code blanc imprimé sur une bouteille rouge…)
     var px = ligne(g); if (!px) return null;
+    if (inv) for (var q = 0; q < px.length; q++) px[q] = 1 - px[q];
     for (var sens = 0; sens < 2; sens++) {
       var p = px; if (sens) { p = new Uint8Array(px.length); for (var k = 0; k < px.length; k++) p[k] = px[px.length - 1 - k]; }
       var r = runs(p, 0);
@@ -793,27 +795,37 @@ var EAN = (function () {
     }
     return null;
   }
-  function gris(d, w, h, x0, y0, dx, dy, n) {
+  function gris(d, w, h, x0, y0, dx, dy, n, mode) {
+    // mode 0 : luminosité ; 1 : canal le plus clair (un fond rouge ou bleu devient clair, les barres noires restent noires)
+    // mode 2 : canal le plus sombre (des barres blanches sur fond de couleur ressortent)
     var g = new Uint8Array(n);
-    for (var i = 0; i < n; i++) { var x = Math.round(x0 + dx * i), y = Math.round(y0 + dy * i), o = (y * w + x) * 4; g[i] = (d[o] * 30 + d[o + 1] * 59 + d[o + 2] * 11) / 100; }
+    for (var i = 0; i < n; i++) {
+      var x = Math.round(x0 + dx * i), y = Math.round(y0 + dy * i), o = (y * w + x) * 4, R = d[o], G = d[o + 1], B = d[o + 2];
+      g[i] = mode === 1 ? Math.max(R, G, B) : (mode === 2 ? Math.min(R, G, B) : (R * 30 + G * 59 + B * 11) / 100);
+    }
     return g;
   }
-  function lireImage(d, w, h, vus, seuil) {
+  // essais : [mode de couleur, barres claires ?] ; le cas habituel d'abord
+  var ESSAIS = [[0, false], [1, false], [2, true], [0, true], [2, false], [1, true]];
+  function lireImage(d, w, h, vus, seuil, essais) {
     // lignes horizontales puis verticales autour du centre ; un code doit être lu « seuil » fois pour être retenu
-    var k, c, y, x; vus = vus || {}; seuil = seuil || 2;
-    for (k = 0; k < 15; k++) {
-      y = Math.round(h * (0.2 + 0.6 * k / 14));
-      c = lireLigne(gris(d, w, h, 0, y, 1, 0, w));
-      if (c) { vus[c] = (vus[c] || 0) + 1; if (vus[c] >= seuil) return c; }
-    }
-    for (k = 0; k < 11; k++) {
-      x = Math.round(w * (0.25 + 0.5 * k / 10));
-      c = lireLigne(gris(d, w, h, x, 0, 0, 1, h));
-      if (c) { vus[c] = (vus[c] || 0) + 1; if (vus[c] >= seuil) return c; }
+    var k, c, y, x, e, m, inv; vus = vus || {}; seuil = seuil || 2; essais = essais || [ESSAIS[0]];
+    for (e = 0; e < essais.length; e++) {
+      m = essais[e][0]; inv = essais[e][1];
+      for (k = 0; k < 15; k++) {
+        y = Math.round(h * (0.2 + 0.6 * k / 14));
+        c = lireLigne(gris(d, w, h, 0, y, 1, 0, w, m), inv);
+        if (c) { vus[c] = (vus[c] || 0) + 1; if (vus[c] >= seuil) return c; }
+      }
+      for (k = 0; k < 11; k++) {
+        x = Math.round(w * (0.25 + 0.5 * k / 10));
+        c = lireLigne(gris(d, w, h, x, 0, 0, 1, h, m), inv);
+        if (c) { vus[c] = (vus[c] || 0) + 1; if (vus[c] >= seuil) return c; }
+      }
     }
     return null;
   }
-  return { lireImage: lireImage, lireLigne: lireLigne };
+  return { lireImage: lireImage, lireLigne: lireLigne, ESSAIS: ESSAIS };
 })();
 
 var MODE_SCAN = '', VUS = {}, TOILE = null;
@@ -837,6 +849,20 @@ function demarrerScan() {
     $('scanEtat').textContent = 'Caméra refusée ou occupée. Autorisez la caméra pour ce site (Réglages › Safari › Caméra sur iPhone, cadenas de l\'adresse sur Android), ou « Photographier le code-barres ».';
   });
 }
+var NIMG = 0;
+function lireCouleurs(v) {
+  // relais pour Android : essais de couleur sur l'image de la vidéo (barres blanches, fond rouge…)
+  try {
+    if (!v.videoWidth) return false;
+    var w = Math.min(960, v.videoWidth), h = Math.round(v.videoHeight * w / v.videoWidth);
+    TOILE = TOILE || document.createElement('canvas'); TOILE.width = w; TOILE.height = h;
+    var cx = TOILE.getContext('2d', { willReadFrequently: true }); cx.drawImage(v, 0, 0, w, h);
+    var ess = EAN.ESSAIS[1 + (NIMG >> 1) % (EAN.ESSAIS.length - 1)];
+    var c = EAN.lireImage(cx.getImageData(0, 0, w, h).data, w, h, VUS, 2, [ess]);
+    if (c) { codeTrouve(c); return true; }
+  } catch (e) {}
+  return false;
+}
 function codeTrouve(code) { if (navigator.vibrate) navigator.vibrate(60); arreterCamera(); ouvrirProduit(null, code); }
 function boucleScan() {
   if (!FLUX) return;
@@ -844,7 +870,9 @@ function boucleScan() {
   if (MODE_SCAN === 'natif') {
     DETECTEUR.detect(v).then(function (r) {
       if (r && r.length && r[0].rawValue) { codeTrouve(r[0].rawValue); return; }
-      BOUCLE = setTimeout(boucleScan, 180);
+      // code sur fond de couleur ou en blanc : le lecteur du téléphone peut échouer, le lecteur intégré prend le relais une image sur deux
+      if ((++NIMG % 2) === 0 && lireCouleurs(v)) return;
+      BOUCLE = setTimeout(boucleScan, 160);
     }).catch(function () { MODE_SCAN = 'js'; BOUCLE = setTimeout(boucleScan, 200); });
     return;
   }
@@ -854,7 +882,9 @@ function boucleScan() {
       var w = Math.min(1280, v.videoWidth), h = Math.round(v.videoHeight * w / v.videoWidth);
       TOILE = TOILE || document.createElement('canvas'); TOILE.width = w; TOILE.height = h;
       var cx = TOILE.getContext('2d', { willReadFrequently: true }); cx.drawImage(v, 0, 0, w, h);
-      var c = EAN.lireImage(cx.getImageData(0, 0, w, h).data, w, h, VUS, 2);
+      // chaque image essaie une façon de lire les couleurs : noir sur blanc, noir sur rouge, blanc sur rouge…
+      var ess = EAN.ESSAIS[(NIMG++) % EAN.ESSAIS.length];
+      var c = EAN.lireImage(cx.getImageData(0, 0, w, h).data, w, h, VUS, 2, ess[0] === 0 && !ess[1] ? [ess] : [EAN.ESSAIS[0], ess]);
       if (c) { codeTrouve(c); return; }
     }
   } catch (e) {}
@@ -870,7 +900,7 @@ $('photoCode').addEventListener('change', function () {
     var w = Math.min(1600, im.naturalWidth), h = Math.round(im.naturalHeight * w / im.naturalWidth);
     var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
     var cx = cv.getContext('2d'); cx.drawImage(im, 0, 0, w, h);
-    var c = EAN.lireImage(cx.getImageData(0, 0, w, h).data, w, h, {}, 1);
+    var c = EAN.lireImage(cx.getImageData(0, 0, w, h).data, w, h, {}, 1, EAN.ESSAIS);
     if (c) codeTrouve(c);
     else $('scanEtat').textContent = 'Code non lu sur la photo : rapprochez-vous, code bien droit et net, ou tapez les chiffres.';
   };
